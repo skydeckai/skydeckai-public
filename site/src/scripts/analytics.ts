@@ -6,13 +6,11 @@
  */
 import { CONSENT_KEY, GA4_ID, GTM_ID, POSTHOG } from "../config/analytics";
 
-type PostHogQueueItem = [string, ...unknown[]];
-
 declare global {
   interface Window {
     dataLayer: unknown[];
     gtag: (...args: unknown[]) => void;
-    posthog?: Record<string, unknown>;
+    posthog?: { init?: (key: string, config: Record<string, unknown>) => void };
   }
 }
 
@@ -43,34 +41,19 @@ function loadAnalytics() {
   loadScript(`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`);
 
   // ---- PostHog via first-party proxy ----
-  const stub: Record<string, unknown> & { _q: PostHogQueueItem[] } = { _q: [] };
-  for (const m of [
-    "init",
-    "capture",
-    "identify",
-    "alias",
-    "register",
-    "reset",
-    "group",
-    "opt_in_capturing",
-    "opt_out_capturing",
-  ]) {
-    stub[m] = (...args: unknown[]) => stub._q.push([m, ...args]);
-  }
-  window.posthog = window.posthog || (stub as unknown as Window["posthog"]);
-
+  // No pre-load stub: array.js defines window.posthog itself, and nothing on
+  // the site calls posthog.* before it lands (capture_pageview covers views).
+  // A hand-rolled queue here is worse than useless — array.js adopts an
+  // existing window.posthog instead of replacing it, so replaying the queue
+  // through it re-queues into the array being iterated and spins forever.
   loadScript(`${POSTHOG.assetsHost}/static/array.js`, () => {
-    const ph = window.posthog as Record<string, (...a: unknown[]) => void>;
-    ph.init?.(POSTHOG.key, {
+    window.posthog?.init?.(POSTHOG.key, {
       api_host: POSTHOG.apiHost,
       ui_host: POSTHOG.uiHost,
       defaults: POSTHOG.defaults,
       person_profiles: "identified_only",
       capture_pageview: true,
     });
-    for (const [method, ...args] of stub._q) {
-      ph[method]?.(...args);
-    }
   });
 }
 
