@@ -23,6 +23,7 @@ sign-off, recorded here.
 | C12 | i18n artifact parity: every locale ships its strings/copy modules and every English legacy-content page exists in all 11 other locales (the translation pipeline may not silently skip pages) | i18n-parity.spec.ts |
 | C13 | Each locale page declares its own `lang` attribute (and `/ar/` is `dir="rtl"`) | i18n-live.spec.ts |
 | C14 | A visitor can submit the contact form and their message has a path out (API success, or mailto fallback while the endpoint is unreleased) | contact.spec.ts |
+| C15 | With consent granted, the page loads analytics without crashing the renderer and PostHog initialises for real (no surviving `_q` stub) | analytics.spec.ts |
 
 ## Known product gaps (documented, not asserted)
 
@@ -48,3 +49,10 @@ sign-off, recorded here.
   pages (proven by A/B bisection against a known-good artifact). If the site
   ever moves behind a host without that scanner, upgrade the phone to `tel:`
   and this contract with it.
+- 2026-08-24 — C15 added after production crashed with Chrome "Aw, Snap!"
+  (error code 5 = V8 fatal OOM). The PostHog bootstrap replayed its own stub
+  queue through `window.posthog`, which array.js adopts instead of replacing,
+  so each replayed call re-queued into the array being iterated: ~4 GB in about
+  three seconds. Fixed by dropping the stub and the replay loop — nothing on
+  the site calls posthog.* before array.js lands, and `capture_pageview`
+  covers page views.
