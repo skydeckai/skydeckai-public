@@ -55,11 +55,11 @@ const organizationLd = JSON.stringify({
 
 const csp = [
   "default-src 'self'",
-  `script-src 'self' https://www.googletagmanager.com ${POSTHOG.assetsHost}`,
+  `script-src 'self' https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net ${POSTHOG.assetsHost}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com",
+  "img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com https://googleads.g.doubleclick.net https://www.google.com https://pagead2.googlesyndication.com https://www.googleadservices.com",
   "font-src 'self'",
-  `connect-src 'self' https://*.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://*.googletagmanager.com https://admin.skydeck.ai ${POSTHOG.apiHost} ${POSTHOG.assetsHost}`,
+  `connect-src 'self' https://*.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://*.googletagmanager.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://ad.doubleclick.net https://www.google.com https://admin.skydeck.ai ${POSTHOG.apiHost} ${POSTHOG.assetsHost}`,
   "frame-src https://www.googletagmanager.com",
   "object-src 'none'",
   "base-uri 'self'",
