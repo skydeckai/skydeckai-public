@@ -24,6 +24,7 @@ sign-off, recorded here.
 | C13 | Each locale page declares its own `lang` attribute (and `/ar/` is `dir="rtl"`) | i18n-live.spec.ts |
 | C14 | A visitor can submit the contact form and their message has a path out (API success, or mailto fallback while the endpoint is unreleased) | contact.spec.ts |
 | C15 | With consent granted, the page loads analytics without crashing the renderer and PostHog initialises for real (no surviving `_q` stub) | analytics.spec.ts |
+| C16 | With consent granted, the Google Ads tag `AW-986099497` is configured through an `arguments`-shaped dataLayer push beside the `js` timestamp and GA4 config, gtag.js completes its pageview pixel, and `?gclid=` is written to `_gcl_aw` (on `.skydeck.ai` in production, where admin.skydeck.ai's sign-up conversion reads it) | analytics.spec.ts |
 
 ## Known product gaps (documented, not asserted)
 
@@ -56,3 +57,9 @@ sign-off, recorded here.
   three seconds. Fixed by dropping the stub and the replay loop — nothing on
   the site calls posthog.* before array.js lands, and `capture_pageview`
   covers page views.
+- 2026-09-03 — C16 added with the Google Ads tag. The `Skydeck-ai-pods-usa`
+  campaign lands on this site, which carried no Ads tag, so no click id was
+  ever stored and every sign-up was unattributable. The same change fixes the
+  gtag shim: it pushed a real Array, which gtag.js drops silently, so GA4 only
+  worked because GTM fired it separately. Consent gating is unchanged — the
+  tag still loads only after Accept.

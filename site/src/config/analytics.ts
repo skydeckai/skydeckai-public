@@ -17,6 +17,7 @@ export const POSTHOG = {
 
 export const GTM_ID = "GTM-N72P33C2";
 export const GA4_ID = "G-0S3DSJDG4H";
+export const ADS_ID = "AW-986099497";
 
 /** localStorage key for the consent decision: "granted" | "denied". */
 export const CONSENT_KEY = "sd-consent";

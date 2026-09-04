@@ -2,9 +2,9 @@
  * Consent-gated analytics bootstrap (bundled external module; CSP allows no
  * inline scripts). Nothing loads until the visitor grants consent — on this
  * page view via the banner's event, or on later views via the stored choice.
- * GTM + GA4 + PostHog (through the t.eastagile.com first-party proxy).
+ * GTM + GA4 + Google Ads + PostHog (through the t.eastagile.com first-party proxy).
  */
-import { CONSENT_KEY, GA4_ID, GTM_ID, POSTHOG } from "../config/analytics";
+import { ADS_ID, CONSENT_KEY, GA4_ID, GTM_ID, POSTHOG } from "../config/analytics";
 
 declare global {
   interface Window {
@@ -31,12 +31,14 @@ function loadAnalytics() {
   // ---- GTM + GA4 ----
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
-  function gtag(...args: unknown[]) {
-    window.dataLayer.push(args);
+  // gtag.js executes `arguments` objects only; a real Array is dropped silently.
+  function gtag(..._args: unknown[]) {
+    window.dataLayer.push(arguments);
   }
   window.gtag = gtag;
   gtag("js", new Date());
   gtag("config", GA4_ID);
+  gtag("config", ADS_ID);
   loadScript(`https://www.googletagmanager.com/gtm.js?id=${GTM_ID}`);
   loadScript(`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`);
 
