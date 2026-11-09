@@ -28,4 +28,4 @@ This repo holds the website itself, published to GitHub Pages:
 
 To work on the site: `cd site && npm install && npm run dev` (Node.js 22.12+), then open `http://localhost:4321`. Pushing to `main` deploys automatically.
 
-To run the contract tests: `cd tests/marketing && npm ci && npx playwright install chromium --with-deps && npm test`. They run against production by default; set `BASE_URL` to point them at a preview deploy. CI runs them daily and on every push to `main`.
+To run the contract tests: `cd tests/marketing && npm ci && npx playwright install chromium --with-deps && npm test`. They run against production by default; set `BASE_URL` to point them at a preview deploy. CI runs them on every pull request against the PR's own build, and against production after each deploy and daily.
