@@ -161,7 +161,8 @@ test.describe("hero videos", () => {
       const src = (await heroVideoPlayer(page).getAttribute("src")) ?? "";
       expect(src).toMatch(/[?&]autoplay=1/);
       expect(src).toMatch(/[?&]mute=1/);
-      await expect(heroVideoTabs(page).first()).toHaveAttribute("aria-selected", "true");
+      // Real YouTube may refuse playback on CI machines, and the carousel then skips on, so which
+      // tab is selected is checked with the fake player above, not here.
       await page.waitForLoadState("networkidle");
       const blocked = await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp);
       expect(blocked.filter((u) => /youtube|ytimg/.test(u))).toEqual([]);
