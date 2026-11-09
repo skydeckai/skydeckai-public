@@ -16,11 +16,17 @@ export const copy: SiteCopy = {
     sub: "Chạy Claude Code, OpenClaw và nhiều công cụ khác trong các pod bền bỉ — nhiều tác nhân cùng lúc, đồng đội của bạn cộng tác trực tiếp trên cùng những terminal, mọi phiên chạy đều do SkyDeck quản trị. Đây chính là quy trình làm việc mà các kỹ sư của bạn vốn đã yêu thích, nay được chia sẻ, bảo mật và quản lý ở cấp doanh nghiệp.",
     ctaPrimary: "Tạo không gian làm việc miễn phí",
     ctaSecondary: "Tìm hiểu Agent Pods →",
-    heroCaptions: [
-      "3 tác nhân Claude Code & OpenClaw đang chạy",
-      "3 đồng đội trực tiếp trong một terminal",
-      "bản xem trước web bên trong pod",
-    ],
+    heroVideos: {
+      label: "Video sản phẩm SkyDeck",
+      play: "Phát",
+      previous: "Video trước",
+      next: "Video tiếp theo",
+      titles: [
+        "Xem trước ứng dụng ngay cạnh terminal",
+        "Thay phiên điều khiển một tác nhân",
+        "Các pod hỏi tác nhân của nhau",
+      ],
+    },
     marqueeLabel: "Không lệ thuộc nhà cung cấp — mang theo mọi mô hình",
     pillarsEyebrow: "Ba trụ cột cho thành công",
     pillarsH2: "Bảo mật. Hợp tác. Tùy chỉnh.",

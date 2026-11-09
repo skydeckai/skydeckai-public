@@ -51,7 +51,7 @@
   "form.success": "Thank you — your message has been sent.",
   "form.fallback": "Your email app has been opened with your message — just hit send.",
   "form.error": "Something went wrong. Please email us directly at legal@skydeck.ai.",
-  "consent.text": "We use analytics cookies to understand how the site is used and improve it. No tracking runs until you accept.",
+  "consent.text": "We use analytics cookies to understand how the site is used and improve it. No tracking runs until you accept, and our YouTube videos load only once you accept or press play.",
   "consent.accept": "Accept",
   "consent.decline": "Decline",
   "consent.aria": "Cookie consent",

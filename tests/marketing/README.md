@@ -15,7 +15,8 @@ npm test                                   # against production
 BASE_URL=https://preview.example npm test  # against a preview/staging deploy
 ```
 
-CI runs the suite daily, on every push to main, and on demand
+CI runs the suite on every pull request against that PR's own build (served
+inside the job), and against production after each deploy, daily, and on demand
 (`.github/workflows/marketing-tests.yml`, `workflow_dispatch` accepts a
 `base_url` input for previews).
 

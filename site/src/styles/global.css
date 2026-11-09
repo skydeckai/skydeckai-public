@@ -189,15 +189,6 @@ h3 {
 }
 
 /* motion */
-@keyframes floaty {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-12px);
-  }
-}
 @keyframes marquee {
   0% {
     transform: translateX(0);
@@ -234,7 +225,6 @@ h3 {
     transform: none;
     transition: none;
   }
-  .floaty,
   [style*="marquee"] {
     animation: none !important;
   }

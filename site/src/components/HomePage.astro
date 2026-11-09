@@ -1,6 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
-import Workspace from "./mocks/Workspace.astro";
+import HeroVideos from "./HeroVideos.astro";
 import Convos from "./mocks/Convos.astro";
 import Budget from "./mocks/Budget.astro";
 import Launcher from "./mocks/Launcher.astro";
@@ -17,6 +17,12 @@ const l = (p: string) => localeUrl(locale, p);
 const h1Lines = c.h1Pre.split("\n");
 const llms = ["ChatGPT", "Claude", "Gemini", "Llama", "Mistral", "HuggingFace", "Together.ai", "Grok", "DeepSeek", "Command R"];
 const marquee = [...llms, ...llms];
+// YouTube ids on the SkyDeck AI channel, in play order (simplest idea first).
+const heroVideos = [
+  { id: "SH_QKADiKh4", poster: "/assets/hero-videos/localhost-preview.jpg" },
+  { id: "zEsbxJLlYpo", poster: "/assets/hero-videos/pair-driving.jpg" },
+  { id: "DW2sA0dzRPc", poster: "/assets/hero-videos/pod-mesh.jpg" },
+].map((v, i) => ({ ...v, title: c.heroVideos.titles[i] }));
 const chipStyles = [
   { bg: "#ECEBF3", fg: "#2A336B" },
   { bg: "#E4E6F0", fg: "#3A4FA0" },
@@ -73,24 +79,14 @@ const chipStyles = [
         <a href={l("agent-pods/")} class="btn-secondary">{c.ctaSecondary}</a>
       </div>
     </div>
-    <div
-      data-px="-0.04"
-      style="position:relative;max-width:1120px;margin:48px auto 0;animation:floaty 10s ease-in-out infinite"
-    >
-      <Workspace />
-    </div>
-    <div
-      style="max-width:1120px;margin:16px auto 0;display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;font-size:14px;color:#8A8FA6"
-    >
-      <span style="display:inline-flex;align-items:center;gap:7px"
-        ><span style="width:7px;height:7px;border-radius:50%;background:#2F8F5F"></span>{c.heroCaptions[0]}</span
-      >
-      <span style="display:inline-flex;align-items:center;gap:7px"
-        ><span style="width:7px;height:7px;border-radius:50%;background:#3A4FA0"></span>{c.heroCaptions[1]}</span
-      >
-      <span style="display:inline-flex;align-items:center;gap:7px"
-        ><span style="width:7px;height:7px;border-radius:50%;background:#B58A34"></span>{c.heroCaptions[2]}</span
-      >
+    <div style="position:relative;max-width:1120px;margin:48px auto 0">
+      <HeroVideos
+        label={c.heroVideos.label}
+        play={c.heroVideos.play}
+        previous={c.heroVideos.previous}
+        next={c.heroVideos.next}
+        videos={heroVideos}
+      />
     </div>
   </section>
 

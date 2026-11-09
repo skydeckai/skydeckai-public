@@ -1,0 +1,644 @@
+---
+// Hero carousel of the product videos: neighbours peek in, and each video slides on to the next
+// when it ends, in a loop. One YouTube player stays in the centre slot (so mute/unmute carries
+// over) above local poster slides; YouTube loads only after consent (muted autoplay) or a choice.
+interface Video {
+  id: string;
+  title: string;
+  poster: string;
+}
+interface Props {
+  label: string;
+  play: string;
+  previous: string;
+  next: string;
+  videos: Video[];
+}
+const { label, play, previous, next, videos } = Astro.props;
+const dots = ["#2F8F5F", "#3A4FA0", "#B58A34"];
+// Same placement rule as the script: slide offset from the current one, wrapped to -n/2..n/2.
+const offsetFrom = (j: number, current: number, n: number) => {
+  const d = (((j - current) % n) + n) % n;
+  return d > n / 2 ? d - n : d;
+};
+---
+
+<div
+  class="hero-videos"
+  data-hero-videos
+  data-ids={videos.map((v) => v.id).join(",")}
+  role="region"
+  aria-roledescription="carousel"
+  aria-label={label}
+>
+  <div class="hv-viewport" dir="ltr">
+    <div class="hv-track">
+      {
+        videos.map((v, i) => (
+          <div
+            class="hv-slide"
+            role="group"
+            aria-roledescription="slide"
+            aria-label={`${i + 1} / ${videos.length}: ${v.title}`}
+            data-offset={offsetFrom(i, 0, videos.length)}
+          >
+            <button type="button" class="hv-poster" data-poster={i} aria-label={`${play}: ${v.title}`}>
+              <img src={v.poster} alt="" width="1280" height="720" loading={i === 0 ? "eager" : "lazy"} />
+              <span class="hv-play" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="30" height="30">
+                  <path d="M8 5.5v13l11-6.5z" fill="currentColor" />
+                </svg>
+              </span>
+            </button>
+          </div>
+        ))
+      }
+      <div class="hv-stage" id="hero-video-panel" role="tabpanel" aria-label={label}>
+        <div data-player></div>
+      </div>
+    </div>
+    <button type="button" class="hv-nav hv-prev" data-step="-1" aria-label={previous}>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </button>
+    <button type="button" class="hv-nav hv-next" data-step="1" aria-label={next}>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </button>
+  </div>
+  <div class="hv-controls">
+    <button type="button" class="hv-nav-row hv-prev-row" data-step="-1" aria-label={previous}>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </button>
+    <div class="hv-tabs" role="tablist" aria-label={label}>
+      {
+        videos.map((v, i) => (
+          <button
+            type="button"
+            role="tab"
+            id={`hero-video-tab-${i}`}
+            aria-controls="hero-video-panel"
+            aria-selected={i === 0 ? "true" : "false"}
+            tabindex={i === 0 ? 0 : -1}
+          >
+            <span class="hv-dot" style={`background:${dots[i % dots.length]}`} />
+            {v.title}
+            <span class="hv-progress" aria-hidden="true">
+              <span />
+            </span>
+          </button>
+        ))
+      }
+    </div>
+    <button type="button" class="hv-nav-row hv-next-row" data-step="1" aria-label={next}>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  import { CONSENT_KEY, CONSENT_VIDEO_KEY } from "../config/analytics";
+
+  type YTPlayer = {
+    loadVideoById(id: string): void;
+    playVideo(): void;
+    pauseVideo(): void;
+    getPlayerState(): number;
+    getCurrentTime(): number;
+    getDuration(): number;
+  };
+  type YTNamespace = {
+    Player: new (el: HTMLElement, opts: object) => YTPlayer;
+    PlayerState: { ENDED: number; PLAYING: number; BUFFERING: number };
+  };
+  type YTWindow = Window & { YT?: YTNamespace; onYouTubeIframeAPIReady?: () => void };
+
+  const API_URL = "https://www.youtube.com/iframe_api";
+  const PLAYER_HOST = "https://www.youtube-nocookie.com";
+  const PROGRESS_TICK_MS = 250;
+  // Pause when less than this share of the player is on screen, resume when it is back.
+  const VISIBLE_SHARE = 0.25;
+  // The API loader is about 1 KB; if it has not arrived by then, YouTube is blocked or down.
+  const API_TIMEOUT_MS = 10_000;
+  // A finger move at least this long, and this many times more sideways than vertical,
+  // counts as a swipe rather than a tap or a page scroll.
+  const SWIPE_PX = 40;
+  const SWIPE_SLOPE = 1.5;
+
+  const w = window as YTWindow;
+  let api: Promise<YTNamespace> | undefined;
+  const loadApi = () =>
+    (api ??= new Promise<YTNamespace>((resolve, reject) => {
+      if (w.YT?.Player) return resolve(w.YT);
+      const s = document.createElement("script");
+      const fail = () => {
+        s.remove();
+        reject(new Error("YouTube iframe API unavailable"));
+      };
+      const timer = window.setTimeout(fail, API_TIMEOUT_MS);
+      const previous = w.onYouTubeIframeAPIReady;
+      w.onYouTubeIframeAPIReady = () => {
+        window.clearTimeout(timer);
+        previous?.();
+        resolve(w.YT!);
+      };
+      s.src = API_URL;
+      s.async = true;
+      s.onerror = () => {
+        window.clearTimeout(timer);
+        fail();
+      };
+      document.head.appendChild(s);
+    }).catch((e) => {
+      api = undefined; // let the next choice try again
+      throw e;
+    }));
+
+  const consented = () => {
+    try {
+      return localStorage.getItem(CONSENT_KEY) === "granted" && localStorage.getItem(CONSENT_VIDEO_KEY) === "granted";
+    } catch {
+      return false;
+    }
+  };
+  const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // The slide animation length, read from the CSS so the two can never disagree.
+  const slideMs = (el: HTMLElement) => parseFloat(getComputedStyle(el).transitionDuration) * 1000 || 0;
+
+  function init(root: HTMLElement) {
+    const ids = (root.dataset.ids ?? "").split(",");
+    const n = ids.length;
+    const slides = [...root.querySelectorAll<HTMLElement>(".hv-slide")];
+    const posters = [...root.querySelectorAll<HTMLButtonElement>("[data-poster]")];
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const bars = tabs.map((t) => t.querySelector<HTMLElement>(".hv-progress > span")!);
+    const mount = root.querySelector<HTMLElement>("[data-player]")!;
+    let current = 0;
+    let player: YTPlayer | undefined;
+    let ready = false; // the player's methods exist only from onReady
+    let creating = false;
+    let inView = true;
+    let pausedByUs = false;
+    let failures = 0; // videos skipped in a row because they could not play
+    let settledAt = 0; // when the current slide animation ends
+    let revealTimer = 0;
+
+    const offsetFrom = (j: number) => {
+      const d = (((j - current) % n) + n) % n;
+      return d > n / 2 ? d - n : d;
+    };
+    const setProgress = (i: number, share: number) =>
+      bars.forEach((b, j) => (b.style.transform = `scaleX(${j === i ? share : 0})`));
+
+    const place = () => {
+      slides.forEach((s, j) => {
+        const before = Number(s.dataset.offset);
+        const after = offsetFrom(j);
+        // A slide wrapping from one side to the other jumps instead of sweeping across.
+        s.classList.toggle("hv-jump", Math.abs(after - before) > 1);
+        s.dataset.offset = String(after);
+        posters[j].tabIndex = Math.abs(after) > 1 ? -1 : 0;
+      });
+      requestAnimationFrame(() => slides.forEach((s) => s.classList.remove("hv-jump")));
+      // Timed on a slide that animates: the wrapping one has its transition switched off.
+      const moving = slides.find((s) => !s.classList.contains("hv-jump")) ?? slides[0];
+      settledAt = performance.now() + slideMs(moving);
+    };
+
+    const select = (i: number) => {
+      current = i;
+      tabs.forEach((t, j) => {
+        t.setAttribute("aria-selected", String(j === i));
+        t.tabIndex = j === i ? 0 : -1;
+      });
+      setProgress(i, 0);
+      place();
+    };
+
+    // Show the player over the centre slide once the slides have stopped moving.
+    const revealWhenSettled = () => {
+      window.clearTimeout(revealTimer);
+      revealTimer = window.setTimeout(
+        () => root.classList.add("is-live"),
+        Math.max(0, settledAt - performance.now()),
+      );
+    };
+
+    const create = (i: number, muted: boolean) => {
+      creating = true;
+      root.classList.add("has-player");
+      loadApi()
+        .then((YT) => {
+          player = new YT.Player(mount, {
+            host: PLAYER_HOST,
+            videoId: ids[i],
+            width: "100%",
+            height: "100%",
+            playerVars: { autoplay: 1, mute: muted ? 1 : 0, playsinline: 1, rel: 0, origin: location.origin },
+            events: {
+              onReady: () => {
+                ready = true;
+                // A choice made while the player was starting wins over the video it started with.
+                if (current !== i) player!.loadVideoById(ids[current]);
+                // Shown even if the browser blocks autoplay, so YouTube's own play button is reachable.
+                revealWhenSettled();
+                followAttention(); // it may have started with the hero already out of sight
+              },
+              onStateChange: (e: { data: number }) => {
+                if (e.data === YT.PlayerState.ENDED) return show(current + 1);
+                if (e.data === YT.PlayerState.PLAYING) {
+                  failures = 0;
+                  followAttention();
+                }
+                if (e.data !== YT.PlayerState.BUFFERING) revealWhenSettled();
+              },
+              // Private, removed or non-embeddable video: skip it, unless every video fails.
+              onError: () => {
+                if (++failures < n) show(current + 1);
+              },
+            },
+          });
+          creating = false;
+        })
+        .catch(() => {
+          creating = false;
+          root.classList.remove("has-player");
+        });
+    };
+
+    function show(target: number, muted = false) {
+      const i = ((target % n) + n) % n;
+      const moving = i !== current;
+      if (moving) {
+        window.clearTimeout(revealTimer);
+        root.classList.remove("is-live");
+      }
+      select(i);
+      if (player) {
+        // Before onReady the choice is only recorded; onReady loads it.
+        if (!ready) return;
+        if (moving) player.loadVideoById(ids[i]);
+        else player.playVideo();
+      } else if (!creating) create(i, muted);
+    }
+
+    posters.forEach((p, j) => p.addEventListener("click", () => show(j)));
+    // Swipe between videos on touch screens (the playing video itself takes its own touches).
+    let touch: { x: number; y: number } | undefined;
+    const track = root.querySelector<HTMLElement>(".hv-track")!;
+    track.addEventListener(
+      "touchstart",
+      (e) => (touch = { x: e.touches[0].clientX, y: e.touches[0].clientY }),
+      { passive: true },
+    );
+    track.addEventListener("touchend", (e) => {
+      if (!touch) return;
+      const dx = e.changedTouches[0].clientX - touch.x;
+      const dy = e.changedTouches[0].clientY - touch.y;
+      touch = undefined;
+      if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > SWIPE_SLOPE * Math.abs(dy)) show(current + (dx < 0 ? 1 : -1));
+    });
+    tabs.forEach((t, j) => t.addEventListener("click", () => show(j)));
+    root.querySelectorAll<HTMLButtonElement>("[data-step]").forEach((b) =>
+      b.addEventListener("click", () => show(current + Number(b.dataset.step))),
+    );
+    root.querySelector('[role="tablist"]')!.addEventListener("keydown", (e) => {
+      const key = (e as KeyboardEvent).key;
+      const step = key === "ArrowRight" ? 1 : key === "ArrowLeft" ? -1 : 0;
+      if (!step) return;
+      const rtl = getComputedStyle(root).direction === "rtl";
+      const at = tabs.indexOf(document.activeElement as HTMLButtonElement);
+      tabs[(at + (rtl ? -step : step) + n) % n].focus();
+      e.preventDefault();
+    });
+
+    window.setInterval(() => {
+      if (document.hidden || !ready || !player) return;
+      const d = player.getDuration();
+      if (d > 0) setProgress(current, Math.min(1, player.getCurrentTime() / d));
+    }, PROGRESS_TICK_MS);
+
+    // Pause while the hero is scrolled away or the tab is in the background; resume only what we paused.
+    const followAttention = () => {
+      if (!ready || !player) return;
+      const wanted = inView && !document.hidden;
+      const state = player.getPlayerState();
+      const running = state === w.YT?.PlayerState.PLAYING || state === w.YT?.PlayerState.BUFFERING;
+      if (!wanted && running) {
+        player.pauseVideo();
+        pausedByUs = true;
+      } else if (wanted && pausedByUs) {
+        player.playVideo();
+        pausedByUs = false;
+      }
+    };
+    new IntersectionObserver(
+      ([entry]) => {
+        inView = entry.isIntersecting;
+        followAttention();
+      },
+      { threshold: VISIBLE_SHARE },
+    ).observe(root);
+    document.addEventListener("visibilitychange", followAttention);
+
+    const autoplay = () => {
+      if (!player && !creating && !reducedMotion()) show(current, true);
+    };
+    if (consented()) autoplay();
+    window.addEventListener("sd-consent-granted", autoplay);
+  }
+
+  const root = document.querySelector<HTMLElement>("[data-hero-videos]");
+  if (root) init(root);
+</script>
+
+<style>
+  .hv-viewport {
+    position: relative;
+  }
+  .hv-track {
+    position: relative;
+    width: 86%;
+    max-width: 100%;
+    margin: 0 auto;
+    aspect-ratio: 16 / 9;
+  }
+  .hv-slide,
+  .hv-stage {
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .hv-slide {
+    --o: 0;
+    --s: 1;
+    --a: 1;
+    border: 1px solid rgba(42, 51, 107, 0.22);
+    background: #0f1330;
+    box-shadow: 0 40px 90px rgba(30, 36, 71, 0.28);
+    transform: translateX(calc(var(--o) * 96%)) scale(var(--s));
+    opacity: var(--a);
+    transition:
+      transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 0.7s ease;
+  }
+  .hv-slide[data-offset="0"] {
+    z-index: 2;
+  }
+  .hv-slide[data-offset="-1"],
+  .hv-slide[data-offset="1"] {
+    --s: 0.84;
+    --a: 0.5;
+    box-shadow: 0 20px 50px rgba(30, 36, 71, 0.18);
+  }
+  .hv-slide[data-offset="-1"] {
+    --o: -1;
+  }
+  .hv-slide[data-offset="1"] {
+    --o: 1;
+  }
+  .hv-slide:not([data-offset="0"]):not([data-offset="-1"]):not([data-offset="1"]) {
+    --a: 0;
+    pointer-events: none;
+  }
+  .hv-slide[data-offset="-1"]:hover,
+  .hv-slide[data-offset="1"]:hover {
+    --a: 0.75;
+  }
+  .hv-slide.hv-jump {
+    transition: none;
+  }
+  .hv-stage {
+    z-index: 3;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+  }
+  .is-live .hv-stage {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .hv-stage :global(iframe),
+  .hv-poster {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .hv-poster {
+    padding: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .hv-poster img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .hv-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 78px;
+    height: 78px;
+    margin: -39px 0 0 -39px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(30, 36, 71, 0.86);
+    color: #f4eee1;
+    box-shadow: 0 14px 44px rgba(30, 36, 71, 0.35);
+    transition:
+      transform 0.2s ease,
+      opacity 0.3s ease;
+  }
+  .hv-slide:not([data-offset="0"]) .hv-play,
+  .has-player .hv-play {
+    opacity: 0;
+  }
+  .hv-poster:hover .hv-play,
+  .hv-poster:focus-visible .hv-play {
+    transform: scale(1.08);
+  }
+  .hv-poster:focus-visible {
+    outline: 3px solid #3a4fa0;
+    outline-offset: -3px;
+  }
+  .hv-nav {
+    position: absolute;
+    top: 50%;
+    z-index: 4;
+    width: 46px;
+    height: 46px;
+    margin-top: -23px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgba(42, 51, 107, 0.18);
+    border-radius: 50%;
+    background: rgba(251, 248, 240, 0.94);
+    color: #2a336b;
+    box-shadow: 0 10px 30px rgba(30, 36, 71, 0.18);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+  .hv-nav:hover {
+    transform: scale(1.06);
+  }
+  .hv-nav:focus-visible {
+    outline: 2px solid #3a4fa0;
+    outline-offset: 2px;
+  }
+  .hv-prev {
+    left: calc(7% - 23px);
+  }
+  .hv-next {
+    right: calc(7% - 23px);
+  }
+  .hv-tabs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .hv-tabs [role="tab"] {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px 10px;
+    border: 0;
+    border-radius: 100px;
+    background: none;
+    font: inherit;
+    font-size: 14px;
+    color: #8a8fa6;
+    cursor: pointer;
+  }
+  .hv-tabs [role="tab"]:hover {
+    color: #5a5f78;
+  }
+  .hv-tabs [role="tab"][aria-selected="true"] {
+    color: #2a336b;
+    background: rgba(42, 51, 107, 0.06);
+  }
+  .hv-tabs [role="tab"]:focus-visible {
+    outline: 2px solid #3a4fa0;
+    outline-offset: 2px;
+  }
+  .hv-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex: none;
+  }
+  .hv-progress {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 4px;
+    height: 2px;
+    overflow: hidden;
+  }
+  .hv-progress > span {
+    display: block;
+    height: 100%;
+    background: #3a4fa0;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s linear;
+  }
+  :global([dir="rtl"]) .hv-tabs .hv-progress > span {
+    transform-origin: right;
+  }
+  .hv-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 22px;
+  }
+  .hv-nav-row {
+    display: none;
+  }
+  /* Phones: the carousel runs edge to edge, and the arrows sit below it beside the current title. */
+  @media (max-width: 640px) {
+    .hv-viewport {
+      margin-inline: calc(50% - 50vw);
+    }
+    .hv-slide,
+    .hv-stage {
+      border-radius: 10px;
+    }
+    .hv-play {
+      width: 56px;
+      height: 56px;
+      margin: -28px 0 0 -28px;
+    }
+    .hv-nav {
+      display: none;
+    }
+    .hv-nav-row {
+      display: flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      border: 1px solid rgba(42, 51, 107, 0.18);
+      border-radius: 50%;
+      background: rgba(251, 248, 240, 0.94);
+      color: #2a336b;
+      box-shadow: 0 8px 22px rgba(30, 36, 71, 0.16);
+      cursor: pointer;
+    }
+    .hv-nav-row:focus-visible {
+      outline: 2px solid #3a4fa0;
+      outline-offset: 2px;
+    }
+    .hv-controls {
+      margin-top: 18px;
+      margin-inline: -24px;
+    }
+    .hv-tabs {
+      flex: 1;
+      min-width: 0;
+      flex-wrap: nowrap;
+      gap: 0;
+    }
+    .hv-tabs [role="tab"][aria-selected="false"] {
+      gap: 0;
+      padding: 10px 6px;
+      font-size: 0;
+    }
+    .hv-tabs [role="tab"][aria-selected="false"] .hv-progress {
+      display: none;
+    }
+    .hv-tabs [role="tab"][aria-selected="true"] {
+      min-width: 0;
+      padding: 8px 12px 10px;
+      font-size: 13.5px;
+      line-height: 1.3;
+      text-align: start;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hv-slide,
+    .hv-stage {
+      transition: none;
+    }
+  }
+</style>

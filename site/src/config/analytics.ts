@@ -21,3 +21,8 @@ export const ADS_ID = "AW-986099497";
 
 /** localStorage key for the consent decision: "granted" | "denied". */
 export const CONSENT_KEY = "sd-consent";
+/**
+ * Set to "granted" alongside CONSENT_KEY by the banner that discloses the hero's YouTube videos.
+ * Acceptances given before that disclosure keep analytics but get click-to-play videos only.
+ */
+export const CONSENT_VIDEO_KEY = "sd-consent-video";

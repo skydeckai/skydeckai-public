@@ -11,11 +11,17 @@ export const copy: SiteCopy = {
     sub: "Kør Claude Code, OpenClaw og mere i vedvarende pods — mange agenter på én gang, dine kolleger, der samarbejder live i de samme terminaler, og hver kørsel styret af SkyDeck. Det er den arbejdsgang, dine udviklere allerede elsker — nu delt, sikker og styret af virksomheden.",
     ctaPrimary: "Opret gratis arbejdsområde",
     ctaSecondary: "Mød Agent Pods →",
-    heroCaptions: [
-      "3 Claude Code- og OpenClaw-agenter kører",
-      "3 kolleger live i én terminal",
-      "en web-forhåndsvisning ind i podden",
-    ],
+    heroVideos: {
+      label: "SkyDeck-produktvideoer",
+      play: "Afspil",
+      previous: "Forrige video",
+      next: "Næste video",
+      titles: [
+        "Se din app ved siden af terminalen",
+        "Skiftes til at styre én agent",
+        "Pods spørger hinandens agenter",
+      ],
+    },
     marqueeLabel: "Ingen leverandørbinding — tag alle modeller med",
     pillarsEyebrow: "Tre søjler til succes",
     pillarsH2: "Sikr. Samarbejd. Tilpas.",

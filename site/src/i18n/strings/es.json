@@ -51,7 +51,7 @@
   "form.success": "Gracias — tu mensaje ha sido enviado.",
   "form.fallback": "Se ha abierto tu aplicación de correo con el mensaje — solo falta enviarlo.",
   "form.error": "Algo salió mal. Escríbenos directamente a legal@skydeck.ai.",
-  "consent.text": "Usamos cookies de análisis para entender cómo se usa el sitio y mejorarlo. No hay seguimiento hasta que aceptes.",
+  "consent.text": "Usamos cookies de análisis para entender cómo se usa el sitio y mejorarlo. No hay seguimiento hasta que aceptes, y nuestros vídeos de YouTube solo se cargan cuando aceptas o pulsas reproducir.",
   "consent.accept": "Aceptar",
   "consent.decline": "Rechazar",
   "consent.aria": "Consentimiento de cookies",

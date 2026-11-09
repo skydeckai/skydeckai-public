@@ -25,6 +25,7 @@ sign-off, recorded here.
 | C14 | A visitor can submit the contact form and their message has a path out (API success, or mailto fallback while the endpoint is unreleased) | contact.spec.ts |
 | C15 | With consent granted, the page loads analytics without crashing the renderer and PostHog initialises for real (no surviving `_q` stub) | analytics.spec.ts |
 | C16 | With consent granted, the Google Ads tag `AW-986099497` is configured through an `arguments`-shaped dataLayer push beside the `js` timestamp and GA4 config, gtag.js completes its pageview pixel, and `?gclid=` is written to `_gcl_aw` (on `.skydeck.ai` in production, where admin.skydeck.ai's sign-up conversion reads it) | analytics.spec.ts |
+| C17 | The homepage hero is a carousel of the product videos: before consent it shows local posters and contacts no YouTube host; choosing a video (tab, arrow, poster or swipe on phones) loads it; with consent given on the banner that mentions the videos, the first video autoplays muted (a decline, or an acceptance from before that banner, never autoplays) and each video advances to the next when it ends, wrapping to the first; a video that cannot play is skipped; YouTube failing to load leaves the choice retryable | hero-videos.spec.ts |
 
 ## Known product gaps (documented, not asserted)
 
@@ -63,3 +64,9 @@ sign-off, recorded here.
   gtag shim: it pushed a real Array, which gtag.js drops silently, so GA4 only
   worked because GTM fired it separately. Consent gating is unchanged — the
   tag still loads only after Accept.
+- 2026-11-09 — C17 added: the hero app mockup was replaced by a carousel of the
+  three product videos hosted on YouTube (requested by the product owner), embedded
+  through the privacy-enhanced youtube-nocookie host. YouTube is contacted only after
+  the visitor accepts the consent banner (whose text now mentions the videos) or chooses
+  a video. The player-lifecycle cases run against a fake YouTube API
+  (`helpers/fake-youtube.ts`) so they do not depend on live YouTube.

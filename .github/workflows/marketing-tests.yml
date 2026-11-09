@@ -1,9 +1,13 @@
 name: marketing-contract-tests
 
+# Pull requests are tested against their own build, served inside the job, so a PR that
+# changes the site is checked on what it ships. Production is tested once each deploy has
+# finished (not on the push itself, which would race the deploy), daily, and on demand.
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_run:
+    workflows: [deploy-site]
+    types: [completed]
   schedule:
     - cron: "43 7 * * *"
   workflow_dispatch:
@@ -13,8 +17,12 @@ on:
         required: false
         default: "https://www.skydeck.ai"
 
+env:
+  PREVIEW_URL: http://localhost:4321
+
 jobs:
   contracts:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -25,13 +33,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Build the site (pull requests)
+        if: github.event_name == 'pull_request'
+        working-directory: site
+        env:
+          ASTRO_TELEMETRY_DISABLED: "1"
+        run: npm ci && npm run build
+      - name: Serve the build (pull requests)
+        if: github.event_name == 'pull_request'
+        working-directory: site
+        env:
+          ASTRO_TELEMETRY_DISABLED: "1"
+        run: |
+          nohup npx astro preview --port 4321 > "$RUNNER_TEMP/preview.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -sf "$PREVIEW_URL/" > /dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/preview.log"
+          exit 1
       - name: Install dependencies
         run: npm ci || npm install
       - name: Install Playwright browser
         run: npx playwright install chromium --with-deps
       - name: Run contract tests
         env:
-          BASE_URL: ${{ github.event.inputs.base_url || 'https://www.skydeck.ai' }}
+          BASE_URL: ${{ github.event_name == 'pull_request' && env.PREVIEW_URL || github.event.inputs.base_url || 'https://www.skydeck.ai' }}
         run: npx playwright test
       - name: Upload report on failure
         if: failure()

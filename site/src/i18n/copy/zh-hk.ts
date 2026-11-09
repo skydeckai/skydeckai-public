@@ -11,11 +11,17 @@ export const copy: SiteCopy = {
     sub: "在持久的 Pod 中運行 Claude Code、OpenClaw 等工具——同時運行多個代理，你的團隊成員在同一終端機中即時協作，每次運行皆由 SkyDeck 管控。這正是你的工程師早已喜愛的工作流程，如今變得可共享、安全並受業務管理。",
     ctaPrimary: "創建免費工作區",
     ctaSecondary: "認識 Agent Pods →",
-    heroCaptions: [
-      "3 個 Claude Code 與 OpenClaw 代理運行中",
-      "3 位團隊成員即時共用一個終端機",
-      "通往 Pod 的網頁預覽",
-    ],
+    heroVideos: {
+      label: "SkyDeck 產品影片",
+      play: "播放",
+      previous: "上一段影片",
+      next: "下一段影片",
+      titles: [
+        "在終端機旁預覽你的應用程式",
+        "輪流操控同一個代理",
+        "Pod 之間互相詢問代理",
+      ],
+    },
     marqueeLabel: "絕無供應商鎖定——自由接入每個模型",
     pillarsEyebrow: "成功的三大支柱",
     pillarsH2: "安全。協作。自訂。",

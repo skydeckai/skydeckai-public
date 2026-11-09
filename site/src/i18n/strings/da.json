@@ -51,7 +51,7 @@
   "form.success": "Tak — din besked er sendt.",
   "form.fallback": "Din mailapp er åbnet med din besked — tryk blot på send.",
   "form.error": "Noget gik galt. Skriv direkte til legal@skydeck.ai.",
-  "consent.text": "Vi bruger analysecookies til at forstå, hvordan sitet bruges, og forbedre det. Ingen sporing kører, før du accepterer.",
+  "consent.text": "Vi bruger analysecookies til at forstå, hvordan sitet bruges, og forbedre det. Ingen sporing kører, før du accepterer, og vores YouTube-videoer indlæses først, når du accepterer eller trykker afspil.",
   "consent.accept": "Accepter",
   "consent.decline": "Afvis",
   "consent.aria": "Cookiesamtykke",

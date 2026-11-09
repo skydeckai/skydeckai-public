@@ -201,3 +201,24 @@ export const SCRIPT_PATTERNS: Partial<Record<(typeof LANGS)[number], RegExp>> = 
   "zh-hk": /[一-鿿]/g,
   ar: /[؀-ۿ]/g,
 };
+
+/** C17: the hero's product-video picker (one tab per video). */
+export function heroVideoTabs(page: Page): Locator {
+  return page.getByRole("tablist", { name: /video/i }).getByRole("tab");
+}
+
+/** C17: the YouTube player embedded in the hero (privacy-enhanced host only). */
+export function heroVideoPlayer(page: Page): Locator {
+  return page.locator('iframe[src*="youtube-nocookie.com/embed/"]');
+}
+
+/** C17: the hero carousel's previous/next controls. */
+export function heroCarouselButton(page: Page, which: "previous" | "next"): Locator {
+  return page.getByRole("button", { name: which === "next" ? /^next video$/i : /^previous video$/i });
+}
+
+/** C17: the hero carousel's video ids, in play order. */
+export async function heroVideoIds(page: Page): Promise<string[]> {
+  const ids = await page.locator("[data-hero-videos]").getAttribute("data-ids");
+  return (ids ?? "").split(",").filter(Boolean);
+}
