@@ -5,8 +5,11 @@ import { fakeFire, fakeReady, fakeState, useFakeYouTube } from "../helpers/fake-
 const VIDEO_COUNT = 3;
 const YOUTUBE_HOSTS = /(^|\.)(youtube\.com|youtube-nocookie\.com|ytimg\.com|googlevideo\.com)$/;
 const ENDED = 0;
-// YouTube's error code for a video whose owner does not allow embedding.
+const PLAYING = 1;
+const PAUSED = 2;
+// YouTube's error codes: owner does not allow embedding; video removed or private.
 const NOT_EMBEDDABLE = 150;
+const NOT_FOUND = 100;
 
 const embeddedVideoId = async (page: Page) => {
   const src = (await heroVideoPlayer(page).getAttribute("src")) ?? "";
@@ -20,14 +23,26 @@ const playerShown = (page: Page) =>
     const s = getComputedStyle(panel);
     return s.opacity === "1" && s.pointerEvents !== "none";
   });
-const grantConsent = (page: Page) =>
-  page.addInitScript(() => {
+const storeConsent = (page: Page, entries: Record<string, string>) =>
+  page.addInitScript((e) => {
     try {
-      localStorage.setItem("sd-consent", "granted");
+      for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v);
     } catch {
       /* storage unavailable — the site treats this as no consent */
     }
+  }, entries);
+// Accepted on the banner that mentions the videos.
+const grantConsent = (page: Page) => storeConsent(page, { "sd-consent": "granted", "sd-consent-video": "granted" });
+const panelOpacity = (page: Page) =>
+  heroVideoPlayer(page).evaluate((f) => Number(getComputedStyle(f.closest('[role="tabpanel"]')!).opacity));
+const youtubeRequestsDuring = async (page: Page, act: () => Promise<void>) => {
+  const seen: string[] = [];
+  page.on("request", (r) => {
+    if (YOUTUBE_HOSTS.test(new URL(r.url()).hostname)) seen.push(r.url());
   });
+  await act();
+  return seen;
+};
 
 test.describe("hero videos", () => {
   test("C17: before consent, the hero offers the product videos without contacting YouTube", async ({
@@ -142,6 +157,41 @@ test.describe("hero videos", () => {
     }).toPass();
   });
 
+
+  test("C17: an acceptance from before the banner mentioned the videos does not autoplay them", async ({ page }) => {
+    await useFakeYouTube(page);
+    await storeConsent(page, { "sd-consent": "granted" });
+
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    await expect(heroVideoPlayer(page)).toHaveCount(0);
+  });
+
+  test("C17: a stored decline loads nothing from YouTube", async ({ page }) => {
+    await storeConsent(page, { "sd-consent": "denied" });
+
+    const requests = await youtubeRequestsDuring(page, async () => {
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
+    });
+
+    expect(requests).toEqual([]);
+    await expect(heroVideoPlayer(page)).toHaveCount(0);
+  });
+
+  test("C17: declining on the banner loads nothing from YouTube", async ({ page }) => {
+    await page.goto("/");
+
+    const requests = await youtubeRequestsDuring(page, async () => {
+      await page.getByRole("button", { name: /^decline$/i }).click();
+      await page.waitForLoadState("networkidle");
+    });
+
+    expect(requests).toEqual([]);
+    await expect(heroVideoPlayer(page)).toHaveCount(0);
+  });
+
   test.describe("with consent granted", () => {
     test.beforeEach(async ({ page }) => grantConsent(page));
 
@@ -193,6 +243,74 @@ test.describe("hero videos", () => {
 
       await expect.poll(() => selectedIndex(page)).toBe(1);
       expect((await fakeState(page))?.current).toBe(ids[1]);
+    });
+
+
+    test("C17: playing or pausing does not move the carousel on", async ({ page }) => {
+      await useFakeYouTube(page);
+      await page.goto("/");
+      await expect(heroVideoPlayer(page)).toHaveCount(1);
+      await fakeReady(page);
+
+      await fakeFire(page, "onStateChange", PLAYING);
+      await fakeFire(page, "onStateChange", PAUSED);
+
+      expect(await selectedIndex(page)).toBe(0);
+      expect((await fakeState(page))?.loaded).toEqual([]);
+    });
+
+    test("C17: an error on the last video wraps round to the first", async ({ page }) => {
+      await useFakeYouTube(page);
+      await page.goto("/");
+      const ids = await heroVideoIds(page);
+      await expect(heroVideoPlayer(page)).toHaveCount(1);
+      await fakeReady(page);
+      await heroVideoTabs(page).nth(VIDEO_COUNT - 1).click();
+
+      await fakeFire(page, "onError", NOT_FOUND);
+
+      await expect.poll(() => selectedIndex(page)).toBe(0);
+      expect((await fakeState(page))?.current).toBe(ids[0]);
+    });
+
+    test("C17: when every video fails, the carousel stops trying", async ({ page }) => {
+      await useFakeYouTube(page);
+      await page.goto("/");
+      await expect(heroVideoPlayer(page)).toHaveCount(1);
+      await fakeReady(page);
+
+      for (let i = 0; i <= VIDEO_COUNT; i++) await fakeFire(page, "onError", NOT_EMBEDDABLE);
+
+      expect((await fakeState(page))?.loaded).toHaveLength(VIDEO_COUNT - 1);
+    });
+
+    test("C17: the player stays hidden until the slides stop, on every move", async ({ page }) => {
+      await useFakeYouTube(page);
+      await page.goto("/");
+      await expect(heroVideoPlayer(page)).toHaveCount(1);
+      await fakeReady(page);
+      // Each move between the 2nd and 3rd videos makes the 1st slide wrap round the back.
+      await heroCarouselButton(page, "next").click();
+      await fakeFire(page, "onStateChange", PLAYING);
+      await expect.poll(() => playerShown(page)).toBe(true);
+
+      await heroCarouselButton(page, "next").click();
+      await fakeFire(page, "onStateChange", PLAYING);
+      await page.waitForTimeout(200);
+
+      expect(await panelOpacity(page), "C17: the player faded back in while the slides were still moving.").toBeLessThan(0.6);
+    });
+
+    test("C17: a video that starts while the hero is scrolled away stays paused", async ({ page }) => {
+      await useFakeYouTube(page);
+      await page.goto("/");
+      await expect(heroVideoPlayer(page)).toHaveCount(1);
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await page.waitForTimeout(300);
+
+      await fakeReady(page);
+
+      expect((await fakeState(page))?.paused).toBeGreaterThan(0);
     });
 
     test("C17: leaving the tab pauses the video", async ({ page }) => {

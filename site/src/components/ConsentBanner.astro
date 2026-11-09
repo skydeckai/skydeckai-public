@@ -23,7 +23,7 @@ const t = { ...en, ...(strings[`../i18n/strings/${locale}.json`] ?? {}) };
 </div>
 
 <script>
-  import { CONSENT_KEY } from "../config/analytics";
+  import { CONSENT_KEY, CONSENT_VIDEO_KEY } from "../config/analytics";
 
   const banner = document.getElementById("consent-banner");
   let stored: string | null = null;
@@ -37,6 +37,7 @@ const t = { ...en, ...(strings[`../i18n/strings/${locale}.json`] ?? {}) };
     const choose = (value: "granted" | "denied") => {
       try {
         localStorage.setItem(CONSENT_KEY, value);
+        if (value === "granted") localStorage.setItem(CONSENT_VIDEO_KEY, value);
       } catch {
         /* best effort */
       }

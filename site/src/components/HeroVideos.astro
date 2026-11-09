@@ -1,9 +1,7 @@
 ---
-// Hero product videos as a carousel: the current video sits in the middle with its neighbours
-// peeking in at the sides; when a video ends the carousel slides on to the next, in a loop.
-// One YouTube player lives in the centre slot (so a visitor's mute/unmute carries over) and the
-// slides are local posters. YouTube is contacted only once the visitor has accepted the consent
-// banner (then the first video starts muted) or chooses a video themselves.
+// Hero carousel of the product videos: neighbours peek in, and each video slides on to the next
+// when it ends, in a loop. One YouTube player stays in the centre slot (so mute/unmute carries
+// over) above local poster slides; YouTube loads only after consent (muted autoplay) or a choice.
 interface Video {
   id: string;
   title: string;
@@ -105,7 +103,7 @@ const offsetFrom = (j: number, current: number, n: number) => {
 </div>
 
 <script>
-  import { CONSENT_KEY } from "../config/analytics";
+  import { CONSENT_KEY, CONSENT_VIDEO_KEY } from "../config/analytics";
 
   type YTPlayer = {
     loadVideoById(id: string): void;
@@ -164,7 +162,7 @@ const offsetFrom = (j: number, current: number, n: number) => {
 
   const consented = () => {
     try {
-      return localStorage.getItem(CONSENT_KEY) === "granted";
+      return localStorage.getItem(CONSENT_KEY) === "granted" && localStorage.getItem(CONSENT_VIDEO_KEY) === "granted";
     } catch {
       return false;
     }
@@ -208,7 +206,9 @@ const offsetFrom = (j: number, current: number, n: number) => {
         posters[j].tabIndex = Math.abs(after) > 1 ? -1 : 0;
       });
       requestAnimationFrame(() => slides.forEach((s) => s.classList.remove("hv-jump")));
-      settledAt = performance.now() + slideMs(slides[0]);
+      // Timed on a slide that animates: the wrapping one has its transition switched off.
+      const moving = slides.find((s) => !s.classList.contains("hv-jump")) ?? slides[0];
+      settledAt = performance.now() + slideMs(moving);
     };
 
     const select = (i: number) => {
@@ -221,7 +221,7 @@ const offsetFrom = (j: number, current: number, n: number) => {
       place();
     };
 
-    // Show the player over the centre slide once it plays and the slides have stopped moving.
+    // Show the player over the centre slide once the slides have stopped moving.
     const revealWhenSettled = () => {
       window.clearTimeout(revealTimer);
       revealTimer = window.setTimeout(
@@ -248,10 +248,14 @@ const offsetFrom = (j: number, current: number, n: number) => {
                 if (current !== i) player!.loadVideoById(ids[current]);
                 // Shown even if the browser blocks autoplay, so YouTube's own play button is reachable.
                 revealWhenSettled();
+                followAttention(); // it may have started with the hero already out of sight
               },
               onStateChange: (e: { data: number }) => {
                 if (e.data === YT.PlayerState.ENDED) return show(current + 1);
-                if (e.data === YT.PlayerState.PLAYING) failures = 0;
+                if (e.data === YT.PlayerState.PLAYING) {
+                  failures = 0;
+                  followAttention();
+                }
                 if (e.data !== YT.PlayerState.BUFFERING) revealWhenSettled();
               },
               // Private, removed or non-embeddable video: skip it, unless every video fails.
@@ -324,7 +328,9 @@ const offsetFrom = (j: number, current: number, n: number) => {
     const followAttention = () => {
       if (!ready || !player) return;
       const wanted = inView && !document.hidden;
-      if (!wanted && player.getPlayerState() === w.YT?.PlayerState.PLAYING) {
+      const state = player.getPlayerState();
+      const running = state === w.YT?.PlayerState.PLAYING || state === w.YT?.PlayerState.BUFFERING;
+      if (!wanted && running) {
         player.pauseVideo();
         pausedByUs = true;
       } else if (wanted && pausedByUs) {
@@ -563,9 +569,6 @@ const offsetFrom = (j: number, current: number, n: number) => {
     justify-content: center;
     gap: 8px;
     margin-top: 22px;
-  }
-  .hv-controls .hv-tabs {
-    margin-top: 0;
   }
   .hv-nav-row {
     display: none;

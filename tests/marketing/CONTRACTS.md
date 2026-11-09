@@ -25,7 +25,7 @@ sign-off, recorded here.
 | C14 | A visitor can submit the contact form and their message has a path out (API success, or mailto fallback while the endpoint is unreleased) | contact.spec.ts |
 | C15 | With consent granted, the page loads analytics without crashing the renderer and PostHog initialises for real (no surviving `_q` stub) | analytics.spec.ts |
 | C16 | With consent granted, the Google Ads tag `AW-986099497` is configured through an `arguments`-shaped dataLayer push beside the `js` timestamp and GA4 config, gtag.js completes its pageview pixel, and `?gclid=` is written to `_gcl_aw` (on `.skydeck.ai` in production, where admin.skydeck.ai's sign-up conversion reads it) | analytics.spec.ts |
-| C17 | The homepage hero is a carousel of the product videos: before consent it shows local posters and contacts no YouTube host; choosing a video (tab, arrow, poster or swipe on phones) loads it; with consent the first video autoplays muted and each video advances to the next when it ends, wrapping to the first; a video that cannot play is skipped; YouTube failing to load leaves the choice retryable | hero-videos.spec.ts |
+| C17 | The homepage hero is a carousel of the product videos: before consent it shows local posters and contacts no YouTube host; choosing a video (tab, arrow, poster or swipe on phones) loads it; with consent given on the banner that mentions the videos, the first video autoplays muted (a decline, or an acceptance from before that banner, never autoplays) and each video advances to the next when it ends, wrapping to the first; a video that cannot play is skipped; YouTube failing to load leaves the choice retryable | hero-videos.spec.ts |
 
 ## Known product gaps (documented, not asserted)
 

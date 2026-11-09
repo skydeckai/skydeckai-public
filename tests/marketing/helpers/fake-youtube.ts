@@ -7,7 +7,7 @@ import { Page } from "@playwright/test";
 
 const FAKE_API = `
 (() => {
-  const state = { created: [], loaded: [], paused: 0, player: null, opts: null };
+  const state = { loaded: [], paused: 0, player: null };
   window.__fakeYT = state;
   window.YT = {
     PlayerState: { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 },
@@ -18,9 +18,7 @@ const FAKE_API = `
       el.replaceWith(frame);
       const self = this;
       self.videoId = opts.videoId;
-      state.created.push(opts.videoId);
       state.player = self;
-      state.opts = opts;
       state.ready = () => {
         self.loadVideoById = (id) => { self.videoId = id; state.loaded.push(id); };
         self.playVideo = () => {};
@@ -46,11 +44,11 @@ export async function useFakeYouTube(page: Page): Promise<void> {
   );
 }
 
-type Fake = { created: string[]; loaded: string[]; paused: number; player: { videoId: string } | null };
+type Fake = { loaded: string[]; paused: number; player: { videoId: string } | null };
 export const fakeState = (page: Page) =>
   page.evaluate(() => {
     const s = (window as unknown as { __fakeYT?: Fake }).__fakeYT;
-    return s ? { created: s.created, loaded: s.loaded, paused: s.paused, current: s.player?.videoId } : undefined;
+    return s ? { loaded: s.loaded, paused: s.paused, current: s.player?.videoId } : undefined;
   });
 export const fakeReady = (page: Page) =>
   page.evaluate(() => (window as unknown as { __fakeYT: { ready(): void } }).__fakeYT.ready());
