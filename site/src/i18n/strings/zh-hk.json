@@ -51,7 +51,7 @@
   "form.success": "多謝——您的留言已發送。",
   "form.fallback": "已為您開啟電郵應用程式並填好內容——按發送即可。",
   "form.error": "出現問題。請直接電郵至 legal@skydeck.ai。",
-  "consent.text": "我們使用分析 Cookie 了解網站的使用情況並加以改進。在您接受之前不會進行任何追蹤。",
+  "consent.text": "我們使用分析 Cookie 了解網站的使用情況並加以改進。在您接受之前不會進行任何追蹤，YouTube 影片亦只會在您接受或按下播放後載入。",
   "consent.accept": "接受",
   "consent.decline": "拒絕",
   "consent.aria": "Cookie 同意",

@@ -41,7 +41,13 @@ export interface SiteCopy {
     sub: string;
     ctaPrimary: string;
     ctaSecondary: string;
-    heroCaptions: [string, string, string];
+    heroVideos: {
+      label: string;
+      play: string;
+      previous: string;
+      next: string;
+      titles: [string, string, string];
+    };
     marqueeLabel: string;
     pillarsEyebrow: string;
     pillarsH2: string;
@@ -134,11 +140,17 @@ export const copy: SiteCopy = {
     sub: "Run Claude Code, OpenClaw and more in persistent pods — many agents at once, your teammates collaborating live in the same terminals, every run governed by SkyDeck. It's the workflow your engineers already love, made shared, secure, and business-managed.",
     ctaPrimary: "Create Free Workspace",
     ctaSecondary: "Meet Agent Pods →",
-    heroCaptions: [
-      "3 Claude Code & OpenClaw agents running",
-      "3 teammates live in one terminal",
-      "a web preview into the pod",
-    ],
+    heroVideos: {
+      label: "SkyDeck product videos",
+      play: "Play",
+      previous: "Previous video",
+      next: "Next video",
+      titles: [
+        "Preview your app beside the terminal",
+        "Take turns driving one agent",
+        "Pods ask each other's agents",
+      ],
+    },
     marqueeLabel: "No vendor lock-in — bring every model",
     pillarsEyebrow: "Three Pillars for Success",
     pillarsH2: "Secure. Collaborate. Customize.",

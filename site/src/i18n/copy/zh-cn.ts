@@ -11,11 +11,17 @@ export const copy: SiteCopy = {
     sub: "在常驻的 Pod 中运行 Claude Code、OpenClaw 等智能体——同时运行多个智能体，团队成员在同一终端中实时协作，每一次运行都由 SkyDeck 统一治理。这正是工程师们早已喜爱的工作流，如今变得可共享、更安全，并由企业统一管理。",
     ctaPrimary: "创建免费工作区",
     ctaSecondary: "了解 Agent Pods →",
-    heroCaptions: [
-      "3 个 Claude Code 与 OpenClaw 智能体正在运行",
-      "3 位团队成员同处一个终端",
-      "Pod 内的网页预览",
-    ],
+    heroVideos: {
+      label: "SkyDeck 产品视频",
+      play: "播放",
+      previous: "上一个视频",
+      next: "下一个视频",
+      titles: [
+        "在终端旁预览你的应用",
+        "轮流操控同一个智能体",
+        "Pod 之间互相询问智能体",
+      ],
+    },
     marqueeLabel: "不受供应商锁定——接入每一个模型",
     pillarsEyebrow: "成功的三大支柱",
     pillarsH2: "安全。协作。定制。",

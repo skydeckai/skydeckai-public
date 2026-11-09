@@ -51,7 +51,7 @@
   "form.success": "Cảm ơn bạn — tin nhắn đã được gửi.",
   "form.fallback": "Ứng dụng email của bạn đã mở kèm nội dung — chỉ cần nhấn gửi.",
   "form.error": "Đã có lỗi xảy ra. Vui lòng gửi email trực tiếp tới legal@skydeck.ai.",
-  "consent.text": "Chúng tôi dùng cookie phân tích để hiểu cách trang được sử dụng và cải thiện nó. Không có theo dõi nào chạy cho đến khi bạn chấp nhận.",
+  "consent.text": "Chúng tôi dùng cookie phân tích để hiểu cách trang được sử dụng và cải thiện nó. Không có theo dõi nào chạy cho đến khi bạn chấp nhận, và video YouTube chỉ tải khi bạn chấp nhận hoặc bấm phát.",
   "consent.accept": "Chấp nhận",
   "consent.decline": "Từ chối",
   "consent.aria": "Đồng ý cookie",

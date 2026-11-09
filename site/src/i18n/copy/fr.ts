@@ -11,11 +11,17 @@ export const copy: SiteCopy = {
     sub: "Exécutez Claude Code, OpenClaw et d'autres agents dans des pods persistants — plusieurs agents à la fois, vos collègues collaborant en direct dans les mêmes terminaux, chaque exécution encadrée par SkyDeck. C'est le flux de travail que vos ingénieurs adorent déjà, rendu partagé, sécurisé et géré par l'entreprise.",
     ctaPrimary: "Créer un espace de travail gratuit",
     ctaSecondary: "Découvrir les Agent Pods →",
-    heroCaptions: [
-      "3 agents Claude Code et OpenClaw en cours d'exécution",
-      "3 collègues en direct dans un même terminal",
-      "un aperçu web du pod",
-    ],
+    heroVideos: {
+      label: "Vidéos produit SkyDeck",
+      play: "Lire",
+      previous: "Vidéo précédente",
+      next: "Vidéo suivante",
+      titles: [
+        "Prévisualisez votre app à côté du terminal",
+        "Pilotez un agent à tour de rôle",
+        "Les pods interrogent les agents des autres pods",
+      ],
+    },
     marqueeLabel: "Aucune dépendance à un fournisseur — apportez chaque modèle",
     pillarsEyebrow: "Trois piliers pour réussir",
     pillarsH2: "Sécuriser. Collaborer. Personnaliser.",

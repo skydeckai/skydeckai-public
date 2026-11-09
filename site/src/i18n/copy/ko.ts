@@ -11,11 +11,17 @@ export const copy: SiteCopy = {
     sub: "Claude Code, OpenClaw 등을 지속형 파드에서 실행하세요. 여러 에이전트를 동시에, 팀원들이 같은 터미널에서 실시간으로 협업하며, 모든 실행은 SkyDeck의 관리 아래 이루어집니다. 엔지니어들이 이미 좋아하는 워크플로를 공유 가능하고, 안전하며, 비즈니스가 관리하는 방식으로 제공합니다.",
     ctaPrimary: "무료 작업 공간 만들기",
     ctaSecondary: "Agent Pods 살펴보기 →",
-    heroCaptions: [
-      "실행 중인 3개의 Claude Code 및 OpenClaw 에이전트",
-      "하나의 터미널에 실시간 접속한 3명의 팀원",
-      "파드 내부를 보여주는 웹 미리보기",
-    ],
+    heroVideos: {
+      label: "SkyDeck 제품 동영상",
+      play: "재생",
+      previous: "이전 동영상",
+      next: "다음 동영상",
+      titles: [
+        "터미널 옆에서 앱 미리보기",
+        "하나의 에이전트를 번갈아 조종",
+        "파드끼리 서로의 에이전트에게 질문",
+      ],
+    },
     marqueeLabel: "공급업체 종속 없음 — 모든 모델을 가져오세요",
     pillarsEyebrow: "성공을 위한 세 가지 기둥",
     pillarsH2: "보안. 협업. 맞춤화.",

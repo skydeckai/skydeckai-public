@@ -11,11 +11,17 @@ export const copy: SiteCopy = {
     sub: "Claude Code、OpenClawなどを永続的なポッドで実行 — 多数のエージェントを同時に動かし、チームメイトが同じターミナルでリアルタイムに協働、すべての実行をSkyDeckが統制します。エンジニアがすでに愛用しているワークフローを、共有・セキュア・ビジネス管理のもとで実現します。",
     ctaPrimary: "無料のワークスペースを作成",
     ctaSecondary: "Agent Podsを見る →",
-    heroCaptions: [
-      "3つのClaude Code・OpenClawエージェントが稼働中",
-      "3人のチームメイトが1つのターミナルに同時参加",
-      "ポッド内へのWebプレビュー",
-    ],
+    heroVideos: {
+      label: "SkyDeck 製品動画",
+      play: "再生",
+      previous: "前の動画",
+      next: "次の動画",
+      titles: [
+        "ターミナルの横でアプリをプレビュー",
+        "1つのエージェントを交代で操作",
+        "ポッド同士がエージェントに質問",
+      ],
+    },
     marqueeLabel: "ベンダーロックインなし — あらゆるモデルを持ち込める",
     pillarsEyebrow: "成功のための3つの柱",
     pillarsH2: "セキュア。協働。カスタマイズ。",
