@@ -81,6 +81,9 @@ export const fakePlayhead = (page: Page, time: number, duration: number) =>
     ([t, d]) => Object.assign((window as unknown as { __fakeYT: Fake }).__fakeYT, { time: t, duration: d }),
     [time, duration] as const,
   );
+/** Sets whether the fake player reports its sound as off. */
+export const fakeMuted = (page: Page, muted: boolean) =>
+  page.evaluate((m) => Object.assign((window as unknown as { __fakeYT: Fake }).__fakeYT, { muted: m }), muted);
 export const fakeReady = (page: Page) =>
   page.evaluate(() => (window as unknown as { __fakeYT: { ready(): void } }).__fakeYT.ready());
 export const fakeFire = (page: Page, name: string, data?: number) =>
