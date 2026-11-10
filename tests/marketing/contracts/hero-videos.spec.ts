@@ -1,4 +1,4 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, Locator, Page, test } from "@playwright/test";
 import {
   heroCarouselButton,
   heroSlides,
@@ -9,7 +9,7 @@ import {
   heroVideoSound,
   heroVideoTabs,
 } from "../helpers/anchors";
-import { fakeFire, fakePlayhead, fakeReady, fakeState, useFakeYouTube } from "../helpers/fake-youtube";
+import { fakeFire, fakeMuted, fakePlayhead, fakeReady, fakeState, useFakeYouTube } from "../helpers/fake-youtube";
 
 const VIDEO_COUNT = 3;
 const YOUTUBE_HOSTS = /(^|\.)(youtube\.com|youtube-nocookie\.com|ytimg\.com|googlevideo\.com)$/;
@@ -126,7 +126,7 @@ test.describe("hero videos", () => {
     const move = await heroCarouselButton(page, "next").evaluate((next) => {
       const slides = next.closest('[aria-roledescription="carousel"]')!.querySelectorAll('[aria-roledescription="slide"]');
       const wrapping = slides[slides.length - 1] as HTMLElement;
-      const slideMs = parseFloat(getComputedStyle(wrapping).transitionDuration) * 1000;
+      const durationMs = parseFloat(getComputedStyle(wrapping).transitionDuration) * 1000;
       (next as HTMLElement).click();
       // What stays behind on the left while the slide itself comes back in on the right.
       const copy = wrapping.previousElementSibling as HTMLElement;
@@ -141,7 +141,7 @@ test.describe("hero videos", () => {
       const began = performance.now();
       return new Promise<typeof start & { copyPath: number[] }>((resolve) => {
         const frame = () => {
-          if (!copy.isConnected || performance.now() - began > slideMs) return resolve({ ...start, copyPath });
+          if (!copy.isConnected || performance.now() - began > durationMs) return resolve({ ...start, copyPath });
           copyPath.push(copy.getBoundingClientRect().left);
           requestAnimationFrame(frame);
         };
@@ -528,6 +528,43 @@ test.describe("hero videos", () => {
       expect((await fakeState(page))?.unloaded).toEqual(["captions", "captions"]);
     });
 
+    test("C17: resuming the same video does not switch its captions off again", async ({ page }) => {
+      await useFakeYouTube(page);
+      await page.goto("/");
+      await expect(heroVideoPlayer(page)).toHaveCount(1);
+      await fakeReady(page);
+
+      await fakeFire(page, "onStateChange", PLAYING);
+      await fakeFire(page, "onStateChange", PAUSED);
+      await fakeFire(page, "onStateChange", PLAYING);
+
+      expect((await fakeState(page))?.unloaded, "C17: captions the visitor turned back on were switched off again.").toEqual([
+        "captions",
+      ]);
+    });
+
+    test("C17: the outgoing video starting to play while the slides move does not leave YouTube's captions on the chosen one", async ({
+      page,
+    }) => {
+      await useFakeYouTube(page);
+      await page.goto("/");
+      const ids = await heroVideoIds(page);
+      await expect(heroVideoPlayer(page)).toHaveCount(1);
+      await fakeReady(page);
+      await fakeFire(page, "onStateChange", BUFFERING);
+
+      await heroCarouselButton(page, "next").click();
+      // The first video gets going only now, as it slides away.
+      await fakeFire(page, "onStateChange", PLAYING);
+      await expect.poll(() => loaded(page)).toEqual([ids[1]]);
+      const unloadsBefore = (await fakeState(page))!.unloaded.length;
+      await fakeFire(page, "onStateChange", PLAYING);
+
+      expect((await fakeState(page))?.unloaded.length, "C17: the chosen video kept YouTube's captions.").toBe(
+        unloadsBefore + 1,
+      );
+    });
+
     test("C17: the sound button unmutes the muted video and mutes it again", async ({ page }) => {
       await useFakeYouTube(page);
       await page.goto("/");
@@ -541,6 +578,18 @@ test.describe("hero videos", () => {
 
       expect((await fakeState(page))?.muted).toBe(true);
       await expect(heroVideoSound(page, "unmute")).toBeVisible();
+    });
+
+    test("C17: a video that plays with its sound on offers to mute it", async ({ page }) => {
+      await useFakeYouTube(page);
+      await page.goto("/");
+      await expect(heroVideoPlayer(page)).toHaveCount(1);
+      await fakeReady(page);
+      await fakeMuted(page, false);
+
+      await fakeFire(page, "onStateChange", PLAYING);
+
+      await expect(heroVideoSound(page, "mute")).toBeVisible();
     });
 
     test("C17: a video that starts while the hero is scrolled away stays paused", async ({ page }) => {
@@ -597,10 +646,9 @@ test.describe("hero videos", () => {
   test.describe("on a phone", () => {
     test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-    const swipe = (page: Page, dx: number, dy: number) =>
-      page.evaluate(
-        ([dx, dy]) => {
-          const target = document.querySelector('[aria-roledescription="carousel"] [aria-roledescription="slide"]')!;
+    const swipe = (page: Page, dx: number, dy: number, on: Locator = heroSlides(page).first()) =>
+      on.evaluate(
+        (target, [dx, dy]) => {
           const r = target.getBoundingClientRect();
           const x = r.left + r.width / 2;
           const y = r.top + r.height / 2;
@@ -630,6 +678,25 @@ test.describe("hero videos", () => {
       await expect.poll(() => selectedIndex(page)).toBe(0);
       await swipe(page, -120, 10);
       await expect.poll(() => selectedIndex(page)).toBe(1);
+    });
+
+    test("C17: over a playing video, a swipe changes the video and a tap pauses it", async ({ page }) => {
+      await grantConsent(page);
+      await useFakeYouTube(page);
+      await page.goto("/");
+      await expect(heroVideoPlayer(page)).toHaveCount(1);
+      await fakeReady(page);
+      await fakeFire(page, "onStateChange", PLAYING);
+      await expect(heroVideoPause(page)).toBeVisible();
+      // Counted from here: the hero may also have been paused while it started.
+      const pausesBefore = (await fakeState(page))!.paused;
+
+      await heroVideoPause(page).tap();
+      expect((await fakeState(page))?.paused, "C17: tapping the playing video did not pause it.").toBe(pausesBefore + 1);
+      expect(await selectedIndex(page)).toBe(0);
+      await swipe(page, -120, 10, heroVideoPause(page));
+
+      await expect.poll(() => selectedIndex(page), { message: "C17: swiping across the playing video did nothing." }).toBe(1);
     });
   });
 });
