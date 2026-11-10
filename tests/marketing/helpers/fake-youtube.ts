@@ -7,7 +7,7 @@ import { Page } from "@playwright/test";
 
 const FAKE_API = `
 (() => {
-  const state = { loaded: [], paused: 0, player: null };
+  const state = { loaded: [], loadedAt: [], played: 0, paused: 0, time: 0, duration: 0, player: null };
   window.__fakeYT = state;
   window.YT = {
     PlayerState: { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 },
@@ -20,12 +20,12 @@ const FAKE_API = `
       self.videoId = opts.videoId;
       state.player = self;
       state.ready = () => {
-        self.loadVideoById = (id) => { self.videoId = id; state.loaded.push(id); };
-        self.playVideo = () => {};
+        self.loadVideoById = (id) => { self.videoId = id; state.loaded.push(id); state.loadedAt.push(performance.now()); };
+        self.playVideo = () => { state.played++; };
         self.pauseVideo = () => { state.paused++; };
         self.getPlayerState = () => 1;
-        self.getCurrentTime = () => 0;
-        self.getDuration = () => 0;
+        self.getCurrentTime = () => state.time;
+        self.getDuration = () => state.duration;
         opts.events.onReady && opts.events.onReady({ target: self });
       };
       state.fire = (name, data) => opts.events[name] && opts.events[name]({ target: self, data });
@@ -44,12 +44,28 @@ export async function useFakeYouTube(page: Page): Promise<void> {
   );
 }
 
-type Fake = { loaded: string[]; paused: number; player: { videoId: string } | null };
+type Fake = {
+  loaded: string[];
+  loadedAt: number[];
+  played: number;
+  paused: number;
+  time: number;
+  duration: number;
+  player: { videoId: string } | null;
+};
 export const fakeState = (page: Page) =>
   page.evaluate(() => {
     const s = (window as unknown as { __fakeYT?: Fake }).__fakeYT;
-    return s ? { loaded: s.loaded, paused: s.paused, current: s.player?.videoId } : undefined;
+    return s
+      ? { loaded: s.loaded, loadedAt: s.loadedAt, played: s.played, paused: s.paused, current: s.player?.videoId }
+      : undefined;
   });
+/** Where the fake player reports it is in the current video, in seconds. */
+export const fakePlayhead = (page: Page, time: number, duration: number) =>
+  page.evaluate(
+    ([t, d]) => Object.assign((window as unknown as { __fakeYT: Fake }).__fakeYT, { time: t, duration: d }),
+    [time, duration] as const,
+  );
 export const fakeReady = (page: Page) =>
   page.evaluate(() => (window as unknown as { __fakeYT: { ready(): void } }).__fakeYT.ready());
 export const fakeFire = (page: Page, name: string, data?: number) =>

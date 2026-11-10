@@ -273,8 +273,13 @@ const offsetFrom = (j: number, current: number, n: number) => {
                 revealWhenSettled();
                 followAttention(); // it may have started with the hero already out of sight
               },
+              // While the next video waits for the slides, events come from the one sliding away:
+              // its end or failure must not move the carousel past the visitor's choice.
               onStateChange: (e: { data: number }) => {
-                if (e.data === YT.PlayerState.ENDED) return show(current + 1);
+                if (e.data === YT.PlayerState.ENDED) {
+                  if (!loading) show(current + 1);
+                  return;
+                }
                 if (e.data === YT.PlayerState.PLAYING) {
                   failures = 0;
                   followAttention();
@@ -284,7 +289,7 @@ const offsetFrom = (j: number, current: number, n: number) => {
               },
               // Private, removed or non-embeddable video: skip it, unless every video fails.
               onError: () => {
-                if (++failures < n) show(current + 1);
+                if (!loading && ++failures < n) show(current + 1);
               },
             },
           });
@@ -316,12 +321,14 @@ const offsetFrom = (j: number, current: number, n: number) => {
       const from = current;
       const moving = i !== from;
       const onScreen = root.classList.contains("is-live");
+      select(i);
       if (moving) {
+        // Hidden and sent off in one step, after the slides' layout work above, so the player
+        // fades on the slide's timing rather than its own quicker fade.
         window.clearTimeout(revealTimer);
         root.classList.remove("is-live");
+        if (onScreen) stage.dataset.offset = String(Math.sign(offsetFrom(from)));
       }
-      select(i);
-      if (moving && onScreen) stage.dataset.offset = String(Math.sign(offsetFrom(from)));
       if (player) {
         // Before onReady the choice is only recorded; onReady loads it.
         if (!ready) return;
