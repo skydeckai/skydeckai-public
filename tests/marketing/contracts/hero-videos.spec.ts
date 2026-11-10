@@ -33,8 +33,9 @@ const storeConsent = (page: Page, entries: Record<string, string>) =>
   }, entries);
 // Accepted on the banner that mentions the videos.
 const grantConsent = (page: Page) => storeConsent(page, { "sd-consent": "granted", "sd-consent-video": "granted" });
-const panelOpacity = (page: Page) =>
-  heroVideoPlayer(page).evaluate((f) => Number(getComputedStyle(f.closest('[role="tabpanel"]')!).opacity));
+const currentVideo = async (page: Page) => (await fakeState(page))?.current;
+const panelLeft = (page: Page) =>
+  heroVideoPlayer(page).evaluate((f) => f.closest('[role="tabpanel"]')!.getBoundingClientRect().left);
 const youtubeRequestsDuring = async (page: Page, act: () => Promise<void>) => {
   const seen: string[] = [];
   page.on("request", (r) => {
@@ -80,6 +81,23 @@ test.describe("hero videos", () => {
     expect(nextOpacity, "C17: the next video is invisible.").toBeGreaterThan(0);
   });
 
+  test("C17: the slide that wraps round comes in from the far side instead of appearing in place", async ({ page }) => {
+    await page.goto("/");
+    const slides = page.locator('[aria-roledescription="carousel"] [aria-roledescription="slide"]');
+    const left = (i: number) => slides.nth(i).evaluate((el) => el.getBoundingClientRect().left);
+    // The last slide peeks in on the left; moving on sends it round to the right-hand peek.
+    const rightPeek = await left(1);
+
+    const startedAt = await heroCarouselButton(page, "next").evaluate((next) => {
+      const wrapping = next.closest('[aria-roledescription="carousel"]')!.querySelectorAll('[aria-roledescription="slide"]')[2];
+      (next as HTMLElement).click();
+      return wrapping.getBoundingClientRect().left;
+    });
+
+    expect(startedAt, "C17: the wrapping slide appeared in place instead of sliding in.").toBeGreaterThan(rightPeek);
+    await expect.poll(() => left(2)).toBe(rightPeek);
+  });
+
   test("C17: choosing a video loads that video in the hero", async ({ page }) => {
     await useFakeYouTube(page);
     await page.goto("/");
@@ -92,7 +110,7 @@ test.describe("hero videos", () => {
     await heroVideoTabs(page).first().click();
 
     await expect(heroVideoTabs(page).first()).toHaveAttribute("aria-selected", "true");
-    expect((await fakeState(page))?.current).toBe(ids[0]);
+    await expect.poll(() => currentVideo(page)).toBe(ids[0]);
   });
 
   test("C17: next and previous move between the videos and wrap around", async ({ page }) => {
@@ -110,7 +128,7 @@ test.describe("hero videos", () => {
     await heroCarouselButton(page, "previous").click();
 
     await expect.poll(() => selectedIndex(page)).toBe(2);
-    expect((await fakeState(page))?.current).toBe(ids[2]);
+    await expect.poll(() => currentVideo(page)).toBe(ids[2]);
   });
 
   test("C17: a choice made while the player is still starting is the video that plays", async ({ page }) => {
@@ -228,7 +246,7 @@ test.describe("hero videos", () => {
       for (const expected of [1, 2, 0]) {
         await fakeFire(page, "onStateChange", ENDED);
         await expect.poll(() => selectedIndex(page)).toBe(expected);
-        expect((await fakeState(page))?.current).toBe(ids[expected]);
+        await expect.poll(() => currentVideo(page)).toBe(ids[expected]);
       }
     });
 
@@ -242,7 +260,7 @@ test.describe("hero videos", () => {
       await fakeFire(page, "onError", NOT_EMBEDDABLE);
 
       await expect.poll(() => selectedIndex(page)).toBe(1);
-      expect((await fakeState(page))?.current).toBe(ids[1]);
+      await expect.poll(() => currentVideo(page)).toBe(ids[1]);
     });
 
 
@@ -270,7 +288,7 @@ test.describe("hero videos", () => {
       await fakeFire(page, "onError", NOT_FOUND);
 
       await expect.poll(() => selectedIndex(page)).toBe(0);
-      expect((await fakeState(page))?.current).toBe(ids[0]);
+      await expect.poll(() => currentVideo(page)).toBe(ids[0]);
     });
 
     test("C17: when every video fails, the carousel stops trying", async ({ page }) => {
@@ -279,26 +297,39 @@ test.describe("hero videos", () => {
       await expect(heroVideoPlayer(page)).toHaveCount(1);
       await fakeReady(page);
 
-      for (let i = 0; i <= VIDEO_COUNT; i++) await fakeFire(page, "onError", NOT_EMBEDDABLE);
+      for (let skipped = 1; skipped < VIDEO_COUNT; skipped++) {
+        await fakeFire(page, "onError", NOT_EMBEDDABLE);
+        await expect.poll(async () => (await fakeState(page))?.loaded.length).toBe(skipped);
+      }
 
+      await fakeFire(page, "onError", NOT_EMBEDDABLE);
+
+      expect(await selectedIndex(page)).toBe(VIDEO_COUNT - 1);
       expect((await fakeState(page))?.loaded).toHaveLength(VIDEO_COUNT - 1);
     });
 
-    test("C17: the player stays hidden until the slides stop, on every move", async ({ page }) => {
+    test("C17: on a move the playing video slides away, and the next one shows only once it plays", async ({
+      page,
+    }) => {
       await useFakeYouTube(page);
       await page.goto("/");
+      const ids = await heroVideoIds(page);
       await expect(heroVideoPlayer(page)).toHaveCount(1);
       await fakeReady(page);
-      // Each move between the 2nd and 3rd videos makes the 1st slide wrap round the back.
-      await heroCarouselButton(page, "next").click();
-      await fakeFire(page, "onStateChange", PLAYING);
       await expect.poll(() => playerShown(page)).toBe(true);
+      const centre = await panelLeft(page);
 
       await heroCarouselButton(page, "next").click();
+      expect(await currentVideo(page), "C17: the next video replaced the one on screen before the slides moved.").toBe(ids[0]);
+      await expect.poll(() => panelLeft(page), { message: "C17: the video on screen did not move with its slide." }).toBeLessThan(centre);
+      // The outgoing video may still report that it is playing while it slides away.
       await fakeFire(page, "onStateChange", PLAYING);
-      await page.waitForTimeout(200);
+      await expect.poll(() => currentVideo(page)).toBe(ids[1]);
+      expect(await playerShown(page), "C17: the next video was shown before it started playing.").toBe(false);
+      await fakeFire(page, "onStateChange", PLAYING);
 
-      expect(await panelOpacity(page), "C17: the player faded back in while the slides were still moving.").toBeLessThan(0.6);
+      await expect.poll(() => playerShown(page)).toBe(true);
+      expect(await panelLeft(page)).toBe(centre);
     });
 
     test("C17: a video that starts while the hero is scrolled away stays paused", async ({ page }) => {
