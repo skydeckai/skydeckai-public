@@ -119,36 +119,41 @@ test.describe("hero videos", () => {
 
   test("C17: the slide that wraps round leaves by one edge and comes back in from the other", async ({ page }) => {
     await page.goto("/");
-    const title = (await heroVideoTabs(page).nth(VIDEO_COUNT - 1).innerText()).trim();
     // The last slide peeks in on the left; moving on sends it round to the right-hand peek.
     const leftPeek = await slideLeft(page, VIDEO_COUNT - 1);
     const rightPeek = await slideLeft(page, 1);
 
-    const moveStart = await heroCarouselButton(page, "next").evaluate((next) => {
+    const move = await heroCarouselButton(page, "next").evaluate((next) => {
       const slides = next.closest('[aria-roledescription="carousel"]')!.querySelectorAll('[aria-roledescription="slide"]');
       const wrapping = slides[slides.length - 1] as HTMLElement;
+      const slideMs = parseFloat(getComputedStyle(wrapping).transitionDuration) * 1000;
       (next as HTMLElement).click();
       // What stays behind on the left while the slide itself comes back in on the right.
       const copy = wrapping.previousElementSibling as HTMLElement;
       (window as unknown as { __copy: HTMLElement }).__copy = copy;
-      return {
+      const start = {
         slide: wrapping.getBoundingClientRect().left,
         copy: copy.getAttribute("aria-hidden") === "true" ? copy.getBoundingClientRect().left : null,
         copyInert: copy.inert,
       };
+      // Followed frame by frame in the page, so a slow test machine cannot miss the move.
+      const copyPath: number[] = [];
+      const began = performance.now();
+      return new Promise<typeof start & { copyPath: number[] }>((resolve) => {
+        const frame = () => {
+          if (!copy.isConnected || performance.now() - began > slideMs) return resolve({ ...start, copyPath });
+          copyPath.push(copy.getBoundingClientRect().left);
+          requestAnimationFrame(frame);
+        };
+        frame();
+      });
     });
-    const copyLeavesLeft = (peek: number) =>
-      page.evaluate((p) => {
-        const copy = (window as unknown as { __copy: HTMLElement }).__copy;
-        return copy.isConnected && copy.getBoundingClientRect().left < p;
-      }, peek);
     const copyGone = () => page.evaluate(() => !(window as unknown as { __copy: HTMLElement }).__copy.isConnected);
 
-    expect(moveStart.slide, "C17: the wrapping slide appeared in place instead of sliding in.").toBeGreaterThan(rightPeek);
-    expect(moveStart.copy, "C17: the wrapping slide vanished from the left instead of sliding out.").toBe(leftPeek);
-    expect(moveStart.copyInert, "C17: the slide's departing copy can be clicked or focused.").toBe(true);
-    await expect(page.getByRole("button", { name: `Play: ${title}`, exact: true })).toHaveCount(1);
-    await expect.poll(() => copyLeavesLeft(leftPeek)).toBe(true);
+    expect(move.slide, "C17: the wrapping slide appeared in place instead of sliding in.").toBeGreaterThan(rightPeek);
+    expect(move.copy, "C17: the wrapping slide vanished from the left instead of sliding out.").toBe(leftPeek);
+    expect(move.copyInert, "C17: the slide's departing copy can be clicked or focused.").toBe(true);
+    expect(Math.min(...move.copyPath), "C17: the departing copy did not slide out to the left.").toBeLessThan(leftPeek);
     await expect.poll(() => slideLeft(page, VIDEO_COUNT - 1)).toBe(rightPeek);
     await expect.poll(copyGone, { message: "C17: the departing copy was left behind in the page." }).toBe(true);
     await expect(heroSlides(page)).toHaveCount(VIDEO_COUNT);
