@@ -16,6 +16,9 @@ export const copy: SiteCopy = {
       play: "再生",
       previous: "前の動画",
       next: "次の動画",
+      pause: "動画を一時停止",
+      mute: "ミュート",
+      unmute: "ミュート解除",
       titles: [
         "ターミナルの横でアプリをプレビュー",
         "1つのエージェントを交代で操作",

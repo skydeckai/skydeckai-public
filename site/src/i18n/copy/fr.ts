@@ -16,6 +16,9 @@ export const copy: SiteCopy = {
       play: "Lire",
       previous: "Vidéo précédente",
       next: "Vidéo suivante",
+      pause: "Mettre la vidéo en pause",
+      mute: "Couper le son",
+      unmute: "Activer le son",
       titles: [
         "Prévisualisez votre app à côté du terminal",
         "Pilotez un agent à tour de rôle",

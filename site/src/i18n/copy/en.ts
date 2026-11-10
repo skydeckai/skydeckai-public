@@ -46,6 +46,9 @@ export interface SiteCopy {
       play: string;
       previous: string;
       next: string;
+      pause: string;
+      mute: string;
+      unmute: string;
       titles: [string, string, string];
     };
     marqueeLabel: string;
@@ -145,6 +148,9 @@ export const copy: SiteCopy = {
       play: "Play",
       previous: "Previous video",
       next: "Next video",
+      pause: "Pause video",
+      mute: "Mute video",
+      unmute: "Unmute video",
       titles: [
         "Preview your app beside the terminal",
         "Take turns driving one agent",

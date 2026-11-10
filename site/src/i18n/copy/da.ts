@@ -16,6 +16,9 @@ export const copy: SiteCopy = {
       play: "Afspil",
       previous: "Forrige video",
       next: "Næste video",
+      pause: "Sæt video på pause",
+      mute: "Slå lyden fra",
+      unmute: "Slå lyden til",
       titles: [
         "Se din app ved siden af terminalen",
         "Skiftes til at styre én agent",

@@ -16,6 +16,9 @@ export const copy: SiteCopy = {
       play: "播放",
       previous: "上一段影片",
       next: "下一段影片",
+      pause: "暫停影片",
+      mute: "影片靜音",
+      unmute: "取消影片靜音",
       titles: [
         "在終端機旁預覽你的應用程式",
         "輪流操控同一個代理",

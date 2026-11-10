@@ -13,9 +13,12 @@ interface Props {
   play: string;
   previous: string;
   next: string;
+  pause: string;
+  mute: string;
+  unmute: string;
   videos: Video[];
 }
-const { label, play, previous, next, videos } = Astro.props;
+const { label, play, previous, next, pause, mute, unmute, videos } = Astro.props;
 const dots = ["#2F8F5F", "#3A4FA0", "#B58A34"];
 // Same placement rule as the script: slide offset from the current one, wrapped to -n/2..n/2.
 const offsetFrom = (j: number, current: number, n: number) => {
@@ -56,6 +59,18 @@ const offsetFrom = (j: number, current: number, n: number) => {
       }
       <div class="hv-stage" id="hero-video-panel" role="tabpanel" aria-label={label}>
         <div data-player></div>
+        {/* Over a playing video, so hovering it never brings up YouTube's own title bar and controls. */}
+        <button type="button" class="hv-shield" data-shield aria-label={pause}></button>
+        <button type="button" class="hv-sound" data-sound data-mute={mute} data-unmute={unmute} aria-label={unmute}>
+          <svg class="hv-sound-on" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"></path>
+            <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+          <svg class="hv-sound-off" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"></path>
+            <path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+        </button>
       </div>
     </div>
     <button type="button" class="hv-nav hv-prev" data-step="-1" aria-label={previous}>
@@ -110,6 +125,10 @@ const offsetFrom = (j: number, current: number, n: number) => {
     loadVideoById(id: string): void;
     playVideo(): void;
     pauseVideo(): void;
+    mute(): void;
+    unMute(): void;
+    isMuted(): boolean;
+    unloadModule(name: string): void; // not in YouTube's reference, but part of its player API
     getPlayerState(): number;
     getCurrentTime(): number;
     getDuration(): number;
@@ -181,6 +200,8 @@ const offsetFrom = (j: number, current: number, n: number) => {
     const bars = tabs.map((t) => t.querySelector<HTMLElement>(".hv-progress > span")!);
     const mount = root.querySelector<HTMLElement>("[data-player]")!;
     const stage = root.querySelector<HTMLElement>(".hv-stage")!;
+    const shield = root.querySelector<HTMLButtonElement>("[data-shield]")!;
+    const sound = root.querySelector<HTMLButtonElement>("[data-sound]")!;
     let current = 0;
     let player: YTPlayer | undefined;
     let ready = false; // the player's methods exist only from onReady
@@ -192,6 +213,7 @@ const offsetFrom = (j: number, current: number, n: number) => {
     let revealTimer = 0;
     let loadTimer = 0;
     let loading = false; // the next video waits for the slides to stop before it replaces this one
+    let captionsOffFor: string | undefined; // the video whose YouTube captions were switched off
 
     const offsetFrom = (j: number) => {
       const d = (((j - current) % n) + n) % n;
@@ -276,6 +298,16 @@ const offsetFrom = (j: number, current: number, n: number) => {
               // While the next video waits for the slides, events come from the one sliding away:
               // its end or failure must not move the carousel past the visitor's choice.
               onStateChange: (e: { data: number }) => {
+                // Covered only while it plays: paused, YouTube's own controls are there to use.
+                const playing = e.data === YT.PlayerState.PLAYING;
+                if (playing || e.data !== YT.PlayerState.BUFFERING) root.classList.toggle("is-playing", playing);
+                if (playing) showSound(player!.isMuted());
+                // The videos carry their own captions, so YouTube's would print the words twice. Once
+                // per video, so captions a visitor turns back on (while paused) stay on.
+                if (playing && captionsOffFor !== ids[current]) {
+                  player!.unloadModule("captions");
+                  captionsOffFor = ids[current];
+                }
                 if (e.data === YT.PlayerState.ENDED) {
                   if (!loading) show(current + 1);
                   return;
@@ -337,6 +369,22 @@ const offsetFrom = (j: number, current: number, n: number) => {
         revealWhenSettled(); // pressing the poster also brings back YouTube's own play button
       } else if (!creating) create(i, muted);
     }
+
+    const showSound = (muted: boolean) => {
+      root.classList.toggle("is-muted", muted);
+      sound.setAttribute("aria-label", (muted ? sound.dataset.unmute : sound.dataset.mute) ?? "");
+    };
+    sound.addEventListener("click", () => {
+      if (!ready || !player) return;
+      // Shown from the request, as the player reports its new state only a moment later.
+      const muted = !root.classList.contains("is-muted");
+      if (muted) player.mute();
+      else player.unMute();
+      showSound(muted);
+    });
+    shield.addEventListener("click", () => {
+      if (ready && player) player.pauseVideo();
+    });
 
     posters.forEach((p, j) => p.addEventListener("click", () => show(j)));
     // Swipe between videos on touch screens (the playing video itself takes its own touches).
@@ -495,6 +543,55 @@ const offsetFrom = (j: number, current: number, n: number) => {
   .is-live .hv-stage {
     opacity: 1;
     pointer-events: auto;
+  }
+  .hv-shield {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .hv-sound {
+    position: absolute;
+    left: 14px;
+    bottom: 14px;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 1px solid rgba(244, 238, 225, 0.28);
+    border-radius: 50%;
+    background: rgba(15, 19, 48, 0.72);
+    color: #f4eee1;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+  .hv-sound:hover {
+    transform: scale(1.06);
+  }
+  .hv-shield:focus-visible,
+  .hv-sound:focus-visible {
+    outline: 3px solid #3a4fa0;
+    outline-offset: -3px;
+  }
+  .is-playing .hv-shield {
+    display: block;
+  }
+  .is-playing .hv-sound {
+    display: flex;
+  }
+  .hv-sound-off,
+  .is-muted .hv-sound-on {
+    display: none;
+  }
+  .is-muted .hv-sound-off {
+    display: block;
   }
   .hv-stage :global(iframe),
   .hv-poster {

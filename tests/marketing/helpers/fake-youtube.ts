@@ -7,7 +7,7 @@ import { Page } from "@playwright/test";
 
 const FAKE_API = `
 (() => {
-  const state = { loaded: [], loadedAt: [], played: 0, paused: 0, time: 0, duration: 0, player: null };
+  const state = { loaded: [], loadedAt: [], unloaded: [], played: 0, paused: 0, time: 0, duration: 0, player: null };
   window.__fakeYT = state;
   window.YT = {
     PlayerState: { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 },
@@ -18,11 +18,16 @@ const FAKE_API = `
       el.replaceWith(frame);
       const self = this;
       self.videoId = opts.videoId;
+      state.muted = v.mute === 1;
       state.player = self;
       state.ready = () => {
         self.loadVideoById = (id) => { self.videoId = id; state.loaded.push(id); state.loadedAt.push(performance.now()); };
         self.playVideo = () => { state.played++; };
         self.pauseVideo = () => { state.paused++; };
+        self.mute = () => { state.muted = true; };
+        self.unMute = () => { state.muted = false; };
+        self.isMuted = () => state.muted;
+        self.unloadModule = (name) => { state.unloaded.push(name); };
         self.getPlayerState = () => 1;
         self.getCurrentTime = () => state.time;
         self.getDuration = () => state.duration;
@@ -49,6 +54,8 @@ type Fake = {
   loadedAt: number[];
   played: number;
   paused: number;
+  muted: boolean;
+  unloaded: string[];
   time: number;
   duration: number;
   player: { videoId: string } | null;
@@ -57,7 +64,15 @@ export const fakeState = (page: Page) =>
   page.evaluate(() => {
     const s = (window as unknown as { __fakeYT?: Fake }).__fakeYT;
     return s
-      ? { loaded: s.loaded, loadedAt: s.loadedAt, played: s.played, paused: s.paused, current: s.player?.videoId }
+      ? {
+          loaded: s.loaded,
+          loadedAt: s.loadedAt,
+          played: s.played,
+          paused: s.paused,
+          muted: s.muted,
+          unloaded: s.unloaded,
+          current: s.player?.videoId,
+        }
       : undefined;
   });
 /** Where the fake player reports it is in the current video, in seconds. */
