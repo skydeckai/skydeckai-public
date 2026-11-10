@@ -1,7 +1,8 @@
 ---
 // Hero carousel of the product videos: neighbours peek in, and each video slides on to the next
-// when it ends, in a loop. One YouTube player stays in the centre slot (so mute/unmute carries
-// over) above local poster slides; YouTube loads only after consent (muted autoplay) or a choice.
+// when it ends, in a loop. One YouTube player sits over the centre slide (so mute/unmute carries
+// over): on a move it travels out with its slide, then returns with the next video once that
+// plays. YouTube loads only after consent (muted autoplay) or a choice.
 interface Video {
   id: string;
   title: string;
@@ -115,7 +116,7 @@ const offsetFrom = (j: number, current: number, n: number) => {
   };
   type YTNamespace = {
     Player: new (el: HTMLElement, opts: object) => YTPlayer;
-    PlayerState: { ENDED: number; PLAYING: number; BUFFERING: number };
+    PlayerState: { UNSTARTED: number; ENDED: number; PLAYING: number; BUFFERING: number };
   };
   type YTWindow = Window & { YT?: YTNamespace; onYouTubeIframeAPIReady?: () => void };
 
@@ -179,6 +180,7 @@ const offsetFrom = (j: number, current: number, n: number) => {
     const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
     const bars = tabs.map((t) => t.querySelector<HTMLElement>(".hv-progress > span")!);
     const mount = root.querySelector<HTMLElement>("[data-player]")!;
+    const stage = root.querySelector<HTMLElement>(".hv-stage")!;
     let current = 0;
     let player: YTPlayer | undefined;
     let ready = false; // the player's methods exist only from onReady
@@ -188,6 +190,8 @@ const offsetFrom = (j: number, current: number, n: number) => {
     let failures = 0; // videos skipped in a row because they could not play
     let settledAt = 0; // when the current slide animation ends
     let revealTimer = 0;
+    let loadTimer = 0;
+    let loading = false; // the next video waits for the slides to stop before it replaces this one
 
     const offsetFrom = (j: number) => {
       const d = (((j - current) % n) + n) % n;
@@ -196,19 +200,37 @@ const offsetFrom = (j: number, current: number, n: number) => {
     const setProgress = (i: number, share: number) =>
       bars.forEach((b, j) => (b.style.transform = `scaleX(${j === i ? share : 0})`));
 
+    // A slide wrapping from one side to the other would cut across the row. Instead a copy of it
+    // carries on off the edge it was leaving by, while the slide itself comes in from beyond the
+    // opposite edge, so the row reads as one continuous scroll.
+    const wrapRound = (s: HTMLElement, before: number, after: number) => {
+      const step = -Math.sign(after - before); // the way the rest of the row is moving
+      const ghost = s.cloneNode(true) as HTMLElement;
+      ghost.removeAttribute("role");
+      ghost.removeAttribute("aria-roledescription");
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.inert = true;
+      s.before(ghost);
+      void ghost.offsetWidth; // commit the start position so the move animates
+      ghost.dataset.offset = String(before + step);
+      window.setTimeout(() => ghost.remove(), slideMs(ghost));
+
+      s.classList.add("hv-jump");
+      s.dataset.offset = String(after - step);
+      void s.offsetWidth;
+      s.classList.remove("hv-jump");
+      s.dataset.offset = String(after);
+    };
+
     const place = () => {
       slides.forEach((s, j) => {
         const before = Number(s.dataset.offset);
         const after = offsetFrom(j);
-        // A slide wrapping from one side to the other jumps instead of sweeping across.
-        s.classList.toggle("hv-jump", Math.abs(after - before) > 1);
-        s.dataset.offset = String(after);
+        if (Math.abs(after - before) > 1) wrapRound(s, before, after);
+        else s.dataset.offset = String(after);
         posters[j].tabIndex = Math.abs(after) > 1 ? -1 : 0;
       });
-      requestAnimationFrame(() => slides.forEach((s) => s.classList.remove("hv-jump")));
-      // Timed on a slide that animates: the wrapping one has its transition switched off.
-      const moving = slides.find((s) => !s.classList.contains("hv-jump")) ?? slides[0];
-      settledAt = performance.now() + slideMs(moving);
+      settledAt = performance.now() + slideMs(slides[0]);
     };
 
     const select = (i: number) => {
@@ -223,6 +245,7 @@ const offsetFrom = (j: number, current: number, n: number) => {
 
     // Show the player over the centre slide once the slides have stopped moving.
     const revealWhenSettled = () => {
+      if (loading) return; // what is playing now is the video sliding away
       window.clearTimeout(revealTimer);
       revealTimer = window.setTimeout(
         () => root.classList.add("is-live"),
@@ -250,17 +273,23 @@ const offsetFrom = (j: number, current: number, n: number) => {
                 revealWhenSettled();
                 followAttention(); // it may have started with the hero already out of sight
               },
+              // While the next video waits for the slides, events come from the one sliding away:
+              // its end or failure must not move the carousel past the visitor's choice.
               onStateChange: (e: { data: number }) => {
-                if (e.data === YT.PlayerState.ENDED) return show(current + 1);
+                if (e.data === YT.PlayerState.ENDED) {
+                  if (!loading) show(current + 1);
+                  return;
+                }
                 if (e.data === YT.PlayerState.PLAYING) {
                   failures = 0;
                   followAttention();
                 }
-                if (e.data !== YT.PlayerState.BUFFERING) revealWhenSettled();
+                // Not while loading (black frame): the poster underneath stays until there is a picture.
+                if (e.data !== YT.PlayerState.BUFFERING && e.data !== YT.PlayerState.UNSTARTED) revealWhenSettled();
               },
               // Private, removed or non-embeddable video: skip it, unless every video fails.
               onError: () => {
-                if (++failures < n) show(current + 1);
+                if (!loading && ++failures < n) show(current + 1);
               },
             },
           });
@@ -272,19 +301,40 @@ const offsetFrom = (j: number, current: number, n: number) => {
         });
     };
 
+    // Swap in the chosen video once the slides stop, with the player back over the centre slide
+    // (hidden until the new video plays).
+    const loadWhenSettled = () => {
+      loading = true;
+      window.clearTimeout(loadTimer);
+      loadTimer = window.setTimeout(
+        () => {
+          loading = false;
+          delete stage.dataset.offset;
+          player!.loadVideoById(ids[current]);
+        },
+        Math.max(0, settledAt - performance.now()),
+      );
+    };
+
     function show(target: number, muted = false) {
       const i = ((target % n) + n) % n;
-      const moving = i !== current;
+      const from = current;
+      const moving = i !== from;
+      const onScreen = root.classList.contains("is-live");
+      select(i);
       if (moving) {
+        // Hidden and sent off in one step, after the slides' layout work above, so the player
+        // fades on the slide's timing rather than its own quicker fade.
         window.clearTimeout(revealTimer);
         root.classList.remove("is-live");
+        if (onScreen) stage.dataset.offset = String(Math.sign(offsetFrom(from)));
       }
-      select(i);
       if (player) {
         // Before onReady the choice is only recorded; onReady loads it.
         if (!ready) return;
-        if (moving) player.loadVideoById(ids[i]);
-        else player.playVideo();
+        if (moving) return loadWhenSettled();
+        player.playVideo();
+        revealWhenSettled(); // pressing the poster also brings back YouTube's own play button
       } else if (!creating) create(i, muted);
     }
 
@@ -319,7 +369,7 @@ const offsetFrom = (j: number, current: number, n: number) => {
     });
 
     window.setInterval(() => {
-      if (document.hidden || !ready || !player) return;
+      if (document.hidden || !ready || !player || loading) return;
       const d = player.getDuration();
       if (d > 0) setProgress(current, Math.min(1, player.getCurrentTime() / d));
     }, PROGRESS_TICK_MS);
@@ -359,6 +409,11 @@ const offsetFrom = (j: number, current: number, n: number) => {
 </script>
 
 <style>
+  .hero-videos {
+    --hv-slide: 0.8s;
+    --hv-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --hv-peek: 0.84; /* size of the neighbours either side */
+  }
   .hv-viewport {
     position: relative;
   }
@@ -386,23 +441,32 @@ const offsetFrom = (j: number, current: number, n: number) => {
     transform: translateX(calc(var(--o) * 96%)) scale(var(--s));
     opacity: var(--a);
     transition:
-      transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
-      opacity 0.7s ease;
+      transform var(--hv-slide) var(--hv-ease),
+      opacity var(--hv-slide) var(--hv-ease);
   }
   .hv-slide[data-offset="0"] {
     z-index: 2;
   }
   .hv-slide[data-offset="-1"],
   .hv-slide[data-offset="1"] {
-    --s: 0.84;
+    --s: var(--hv-peek);
     --a: 0.5;
     box-shadow: 0 20px 50px rgba(30, 36, 71, 0.18);
   }
-  .hv-slide[data-offset="-1"] {
+  .hv-slide[data-offset="-1"],
+  .hv-stage[data-offset="-1"] {
     --o: -1;
   }
-  .hv-slide[data-offset="1"] {
+  .hv-slide[data-offset="1"],
+  .hv-stage[data-offset="1"] {
     --o: 1;
+  }
+  /* Just beyond the peeking neighbours: where a wrapping slide leaves to and comes in from. */
+  .hv-slide[data-offset="-2"] {
+    --o: -2;
+  }
+  .hv-slide[data-offset="2"] {
+    --o: 2;
   }
   .hv-slide:not([data-offset="0"]):not([data-offset="-1"]):not([data-offset="1"]) {
     --a: 0;
@@ -419,7 +483,14 @@ const offsetFrom = (j: number, current: number, n: number) => {
     z-index: 3;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.35s ease;
+    transition: opacity 0.5s ease;
+  }
+  /* The video on screen travels out with its slide, fading into that slide's poster. */
+  .hv-stage[data-offset] {
+    transform: translateX(calc(var(--o) * 96%)) scale(var(--hv-peek));
+    transition:
+      transform var(--hv-slide) var(--hv-ease),
+      opacity var(--hv-slide) var(--hv-ease);
   }
   .is-live .hv-stage {
     opacity: 1;

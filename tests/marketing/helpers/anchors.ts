@@ -222,3 +222,13 @@ export async function heroVideoIds(page: Page): Promise<string[]> {
   const ids = await page.locator("[data-hero-videos]").getAttribute("data-ids");
   return (ids ?? "").split(",").filter(Boolean);
 }
+
+/** C17: the hero's slides (one per video), in play order. */
+export function heroSlides(page: Page): Locator {
+  return page.locator('[aria-roledescription="carousel"] [aria-roledescription="slide"]');
+}
+
+/** C17: the progress bar under one of the hero's video tabs. */
+export function heroVideoProgress(page: Page, index: number): Locator {
+  return heroVideoTabs(page).nth(index).locator(".hv-progress > span");
+}
