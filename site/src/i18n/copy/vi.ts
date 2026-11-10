@@ -21,6 +21,9 @@ export const copy: SiteCopy = {
       play: "Phát",
       previous: "Video trước",
       next: "Video tiếp theo",
+      pause: "Tạm dừng video",
+      mute: "Tắt tiếng video",
+      unmute: "Bật tiếng video",
       titles: [
         "Xem trước ứng dụng ngay cạnh terminal",
         "Thay phiên điều khiển một tác nhân",

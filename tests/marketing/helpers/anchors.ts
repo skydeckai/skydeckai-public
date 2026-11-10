@@ -232,3 +232,13 @@ export function heroSlides(page: Page): Locator {
 export function heroVideoProgress(page: Page, index: number): Locator {
   return heroVideoTabs(page).nth(index).locator(".hv-progress > span");
 }
+
+/** C17: the button covering the playing hero video, which pauses it. */
+export function heroVideoPause(page: Page): Locator {
+  return page.getByRole("button", { name: /^pause video$/i });
+}
+
+/** C17: the hero video's own sound button, labelled for what pressing it does. */
+export function heroVideoSound(page: Page, action: "mute" | "unmute"): Locator {
+  return page.getByRole("button", { name: action === "mute" ? /^mute video$/i : /^unmute video$/i });
+}

@@ -16,6 +16,9 @@ export const copy: SiteCopy = {
       play: "재생",
       previous: "이전 동영상",
       next: "다음 동영상",
+      pause: "동영상 일시정지",
+      mute: "음소거",
+      unmute: "음소거 해제",
       titles: [
         "터미널 옆에서 앱 미리보기",
         "하나의 에이전트를 번갈아 조종",
